@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pontinho Master</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        /* Animações simples */
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body class="bg-green-800 text-gray-800 font-sans min-h-screen flex flex-col">
+
+    <div id="app" class="flex-grow flex flex-col max-w-md mx-auto w-full bg-green-800 shadow-2xl min-h-screen relative">
+        
+        <div id="setup-screen" class="flex flex-col items-center justify-center p-6 flex-grow fade-in">
+            <i class="fa-solid fa-layer-group text-white text-6xl mb-4"></i>
+            <h1 class="text-4xl font-bold text-white mb-8">PONTINHO</h1>
+            
+            <div class="w-full bg-white rounded-xl shadow-lg p-4 mb-4">
+                <label class="block text-gray-600 text-sm font-bold mb-2">Valor da Entrada (R$)</label>
+                <input type="number" id="entry-fee" class="w-full text-lg p-2 border-b-2 border-green-500 outline-none focus:bg-green-50" placeholder="0.00">
+            </div>
+
+            <div class="w-full bg-white rounded-xl shadow-lg p-4 mb-8">
+                <label class="block text-gray-600 text-sm font-bold mb-2">Valor da Reentrada (R$)</label>
+                <input type="number" id="rebuy-fee" class="w-full text-lg p-2 border-b-2 border-green-500 outline-none focus:bg-green-50" placeholder="0.00">
+            </div>
+
+            <button onclick="startGame()" class="bg-white text-green-900 font-bold py-4 px-12 rounded-full shadow-lg hover:bg-gray-100 transition transform hover:scale-105">
+                ABRIR MESA
+            </button>
+        </div>
+
+        <div id="game-screen" class="hidden flex-col h-screen fade-in">
+            <div class="bg-green-900 p-4 shadow-md flex justify-between items-center sticky top-0 z-10">
+                <div class="text-white font-bold text-xl">
+                    Pote: R$ <span id="total-pot">0.00</span>
+                </div>
+                <button onclick="openAddPlayerModal()" class="bg-green-600 text-white p-2 rounded-full hover:bg-green-500 w-10 h-10 flex items-center justify-center shadow-lg">
+                    <i class="fa-solid fa-user-plus"></i>
+                </button>
+            </div>
+
+            <div id="players-list" class="flex-grow overflow-y-auto p-4 space-y-3 pb-24">
+                </div>
+
+            <div class="p-4 bg-green-800 sticky bottom-0 w-full">
+                <button id="btn-end-round" onclick="openEndRoundModal()" class="w-full bg-yellow-500 text-black font-bold py-4 rounded-lg shadow-xl hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed">
+                    FECHAR RODADA
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <div id="modal-add-player" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg p-6 w-full max-w-sm">
+            <h2 class="text-xl font-bold mb-4">Novo Jogador</h2>
+            <input type="text" id="new-player-name" class="w-full border p-2 rounded mb-4 uppercase" placeholder="Nome">
+            <div class="flex justify-end gap-2">
+                <button onclick="closeModal('modal-add-player')" class="px-4 py-2 text-gray-600">Cancelar</button>
+                <button onclick="confirmAddPlayer()" class="px-4 py-2 bg-green-600 text-white rounded font-bold">Adicionar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-end-round" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg p-6 w-full max-w-sm max-h-[80vh] flex flex-col">
+            <h2 class="text-xl font-bold mb-2">Fim da Rodada</h2>
+            <p class="text-sm text-gray-600 mb-4">Quantos pontos cada um PERDEU?</p>
+            
+            <div id="round-inputs" class="overflow-y-auto flex-grow mb-4 space-y-2">
+                </div>
+
+            <div class="flex justify-end gap-2 mt-auto">
+                <button onclick="closeModal('modal-end-round')" class="px-4 py-2 text-gray-600">Cancelar</button>
+                <button onclick="processRound()" class="px-4 py-2 bg-green-600 text-white rounded font-bold">Processar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- ESTADO DO JOGO ---
+        let players = [];
+        let config = { entry: 0, rebuy: 0 };
+
+        // --- NAVEGAÇÃO E SETUP ---
+        function startGame() {
+            const entryInput = document.getElementById('entry-fee').value;
+            const rebuyInput = document.getElementById('rebuy-fee').value;
+
+            if (!entryInput || !rebuyInput) {
+                alert("Preencha os valores de entrada e reentrada!");
+                return;
+            }
+
+            config.entry = parseFloat(entryInput);
+            config.rebuy = parseFloat(rebuyInput);
+
+            document.getElementById('setup-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.replace('hidden', 'flex');
+            
+            renderGame();
+        }
+
+        // --- LÓGICA CORE ---
+
+        function getLowestScore() {
+            const activePlayers = players.filter(p => !p.eliminated && p.score >= 0);
+            if (activePlayers.length === 0) return 99;
+            return Math.min(...activePlayers.map(p => p.score));
+        }
+
+        function confirmAddPlayer() {
+            const nameInput = document.getElementById('new-player-name');
+            const name = nameInput.value.trim();
+            if (!name) return;
+
+            // Regra: Entra com a menor pontuação ou 99
+            const startScore = (players.length > 0) ? getLowestScore() : 99;
+
+            players.push({
+                id: Date.now(), // ID único
+                name: name,
+                score: startScore,
+                debt: config.entry,
+                hasPaid: false,
+                eliminated: false
+            });
+
+            nameInput.value = '';
+            closeModal('modal-add-player');
+            renderGame();
+        }
+
+        function togglePayment(id) {
+            const player = players.find(p => p.id === id);
+            if (player && player.debt > 0) {
+                player.hasPaid = !player.hasPaid;
+                renderGame();
+            }
+        }
+
+        // --- LÓGICA DA RODADA ---
+
+        function openEndRoundModal() {
+            const container = document.getElementById('round-inputs');
+            container.innerHTML = '';
+
+            players.filter(p => !p.eliminated).forEach(p => {
+                container.innerHTML += `
+                    <div class="flex items-center justify-between bg-gray-50 p-2 rounded">
+                        <span class="font-bold text-gray-700">${p.name}</span>
+                        <input type="number" id="input-${p.id}" class="w-20 border rounded p-1 text-center" placeholder="0">
+                    </div>
+                `;
+            });
+
+            document.getElementById('modal-end-round').classList.remove('hidden');
+        }
+
+        function processRound() {
+            // 1. Atualizar Pontos
+            players.forEach(p => {
+                if (!p.eliminated) {
+                    const input = document.getElementById(`input-${p.id}`);
+                    if (input) {
+                        const lost = parseInt(input.value) || 0;
+                        p.score -= lost;
+                    }
+                }
+            });
+
+            closeModal('modal-end-round');
+            checkEstouros();
+            renderGame();
+        }
+
+        // --- LÓGICA DE ESTOURO E REBUY ---
+
+        async function checkEstouros() {
+            for (let player of players) {
+                if (!player.eliminated && player.score < 0) {
+                    // Checa sobreviventes (incluindo o ganhador)
+                    const survivors = players.filter(p => p.score >= 0).length;
+                    
+                    if (survivors >= 1) {
+                        // REBUY FLOW
+                        if (confirm(`${player.name} ESTOUROU com ${player.score} pontos!\n\nDeseja pagar a volta (R$ ${config.rebuy.toFixed(2)})?`)) {
+                            // Sim: Pega menor pontuação positiva (excluindo ele mesmo pois está negativo)
+                            const targetScore = players
+                                .filter(p => p.score >= 0 && p.id !== player.id)
+                                .map(p => p.score)
+                                .reduce((min, cur) => Math.min(min, cur), 99);
+                            
+                            player.score = targetScore;
+                            player.debt += config.rebuy;
+                            player.hasPaid = false;
+                        } else {
+                            player.eliminated = true;
+                        }
+                    } else {
+                        // Game Over direto
+                        alert(`${player.name} foi eliminado!`);
+                        player.eliminated = true;
+                    }
+                }
+            }
+            renderGame();
+        }
+
+        // --- RENDERIZAÇÃO (UI) ---
+
+        function renderGame() {
+            // Atualiza Pote
+            const totalPot = players.reduce((sum, p) => sum + p.debt, 0);
+            document.getElementById('total-pot').innerText = totalPot.toFixed(2);
+
+            // Renderiza Lista
+            const list = document.getElementById('players-list');
+            list.innerHTML = '';
+
+            if (players.length === 0) {
+                list.innerHTML = '<div class="text-center text-white opacity-70 mt-10">Adicione jogadores para começar!</div>';
+            }
+
+            players.forEach(p => {
+                const cardColor = p.eliminated ? 'bg-gray-400' : 'bg-white';
+                const scoreColor = p.score < 0 ? 'bg-red-500 text-white' : 'bg-green-100 text-green-800';
+                const moneyIcon = p.hasPaid ? 'text-green-600 fa-circle-check' : 'text-red-500 fa-sack-dollar';
+                const moneyText = p.hasPaid ? 'Pago' : `Deve R$ ${p.debt.toFixed(2)}`;
+                const textColor = p.eliminated ? 'line-through text-gray-600' : 'text-gray-800';
+
+                const html = `
+                <div class="${cardColor} rounded-xl shadow p-3 flex items-center justify-between transition-all">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ${p.eliminated ? 'bg-black text-white' : scoreColor}">
+                            ${p.eliminated ? '<i class="fa-solid fa-skull"></i>' : p.score}
+                        </div>
+                        <div>
+                            <div class="font-bold ${textColor}">${p.name}</div>
+                            ${!p.eliminated && p.debt > 0 ? `<div class="text-xs text-gray-500">${moneyText}</div>` : ''}
+                        </div>
+                    </div>
+                    
+                    ${!p.eliminated ? `
+                    <button onclick="togglePayment(${p.id})" class="text-2xl hover:scale-110 transition">
+                        <i class="fa-solid ${moneyIcon}"></i>
+                    </button>
+                    ` : ''}
+                </div>`;
+                list.innerHTML += html;
+            });
+
+            // Controla botão de fechar rodada
+            const activeCount = players.filter(p => !p.eliminated).length;
+            document.getElementById('btn-end-round').disabled = activeCount < 2;
+        }
+
+        // --- UTILITÁRIOS ---
+        function openAddPlayerModal() {
+            document.getElementById('modal-add-player').classList.remove('hidden');
+            document.getElementById('new-player-name').focus();
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
