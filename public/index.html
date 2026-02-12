@@ -3,299 +3,222 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="description" content="Pontinho Master - Gerenciador de pontuação para o jogo de cartas Pontinho">
+    <meta name="theme-color" content="#166534">
     <title>Pontinho Master</title>
+
+    <!-- Tailwind CSS (CDN + Config) -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    animation: {
+                        'fade-in': 'fadeIn 0.3s ease-in-out',
+                        'slide-up': 'slideUp 0.3s ease-out',
+                        'slide-down': 'slideDown 0.3s ease-out',
+                        'pulse-once': 'pulseOnce 0.4s ease-in-out',
+                        'toast-in': 'toastIn 0.3s ease-out',
+                        'toast-out': 'toastOut 0.3s ease-in forwards',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            from: { opacity: '0' },
+                            to: { opacity: '1' },
+                        },
+                        slideUp: {
+                            from: { opacity: '0', transform: 'translateY(20px)' },
+                            to: { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        slideDown: {
+                            from: { opacity: '0', transform: 'translateY(-10px)' },
+                            to: { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        pulseOnce: {
+                            '0%, 100%': { transform: 'scale(1)' },
+                            '50%': { transform: 'scale(1.05)' },
+                        },
+                        toastIn: {
+                            from: { opacity: '0', transform: 'translateY(-100%)' },
+                            to: { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        toastOut: {
+                            from: { opacity: '1', transform: 'translateY(0)' },
+                            to: { opacity: '0', transform: 'translateY(-100%)' },
+                        },
+                    },
+                },
+            },
+        };
+    </script>
+
+    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-    <style>
-        /* Animações simples */
-        .fade-in {
-            animation: fadeIn 0.3s ease-in-out;
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-            }
-
-            to {
-                opacity: 1;
-            }
-        }
-    </style>
+    <!-- Estilos Customizados -->
+    <link rel="stylesheet" href="styles.css">
 </head>
 
-<body class="bg-green-800 text-gray-800 font-sans min-h-screen flex flex-col">
+<body class="bg-green-900 text-gray-800 font-sans min-h-screen flex flex-col">
 
-    <div id="app" class="flex-grow flex flex-col max-w-md mx-auto w-full bg-green-800 shadow-2xl min-h-screen relative">
+    <!-- Toast Notifications -->
+    <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-2 w-[90%] max-w-sm pointer-events-none" role="status" aria-live="polite"></div>
 
-        <div id="setup-screen" class="flex flex-col items-center justify-center p-6 flex-grow fade-in">
-            <i class="fa-solid fa-layer-group text-white text-6xl mb-4"></i>
-            <h1 class="text-4xl font-bold text-white mb-8">PONTINHO</h1>
+    <main id="app" class="flex-grow flex flex-col w-full max-w-md md:max-w-lg lg:max-w-xl mx-auto bg-green-800 shadow-2xl min-h-screen relative">
+
+        <!-- Tela de Setup -->
+        <section id="setup-screen" class="flex flex-col items-center justify-center p-6 md:p-10 flex-grow animate-fade-in" aria-label="Configurar mesa">
+            <i class="fa-solid fa-layer-group text-white text-5xl md:text-6xl mb-4" aria-hidden="true"></i>
+            <h1 class="text-3xl md:text-4xl font-bold text-white mb-8">PONTINHO</h1>
 
             <div class="w-full bg-white rounded-xl shadow-lg p-4 mb-4">
-                <label class="block text-gray-600 text-sm font-bold mb-2">Valor da Entrada (R$)</label>
-                <input type="number" id="entry-fee"
-                    class="w-full text-lg p-2 border-b-2 border-green-500 outline-none focus:bg-green-50"
-                    placeholder="0.00">
+                <label for="entry-fee" class="block text-gray-600 text-sm font-bold mb-2">Valor da Entrada (R$)</label>
+                <input type="number" id="entry-fee" min="0" step="0.01"
+                    class="w-full text-lg p-2 border-b-2 border-green-500 outline-none focus:bg-green-50 focus:ring-2 focus:ring-green-300 rounded min-h-[44px]"
+                    placeholder="0.00" inputmode="decimal">
             </div>
 
             <div class="w-full bg-white rounded-xl shadow-lg p-4 mb-8">
-                <label class="block text-gray-600 text-sm font-bold mb-2">Valor da Reentrada (R$)</label>
-                <input type="number" id="rebuy-fee"
-                    class="w-full text-lg p-2 border-b-2 border-green-500 outline-none focus:bg-green-50"
-                    placeholder="0.00">
+                <label for="rebuy-fee" class="block text-gray-600 text-sm font-bold mb-2">Valor da Reentrada (R$)</label>
+                <input type="number" id="rebuy-fee" min="0" step="0.01"
+                    class="w-full text-lg p-2 border-b-2 border-green-500 outline-none focus:bg-green-50 focus:ring-2 focus:ring-green-300 rounded min-h-[44px]"
+                    placeholder="0.00" inputmode="decimal">
             </div>
 
-            <button onclick="startGame()"
-                class="bg-white text-green-900 font-bold py-4 px-12 rounded-full shadow-lg hover:bg-gray-100 transition transform hover:scale-105">
+            <button type="button" id="btn-start-game"
+                class="bg-white text-green-900 font-bold py-4 px-12 rounded-full shadow-lg hover:bg-gray-100 active:scale-95 transition-all focus:ring-4 focus:ring-green-300 focus:outline-none min-h-[44px]">
                 ABRIR MESA
             </button>
-        </div>
+        </section>
 
-        <div id="game-screen" class="hidden flex-col h-screen fade-in">
-            <div class="bg-green-900 p-4 shadow-md flex justify-between items-center sticky top-0 z-10">
-                <div class="text-white font-bold text-xl">
-                    Pote: R$ <span id="total-pot">0.00</span>
+        <!-- Tela do Jogo -->
+        <section id="game-screen" class="hidden flex-col h-screen animate-fade-in" aria-label="Jogo em andamento">
+            <header class="bg-green-900 p-4 shadow-md flex justify-between items-center sticky top-0 z-10 safe-top">
+                <div class="flex items-center gap-3">
+                    <button type="button" id="btn-new-game" aria-label="Nova mesa"
+                        class="text-white hover:text-yellow-300 active:scale-95 transition-all focus:ring-2 focus:ring-yellow-300 focus:outline-none rounded-full w-10 h-10 flex items-center justify-center min-h-[44px]">
+                        <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
+                    </button>
+                    <div class="text-white font-bold text-lg md:text-xl">
+                        Pote: R$ <span id="total-pot">0.00</span>
+                    </div>
                 </div>
-                <button onclick="openAddPlayerModal()"
-                    class="bg-green-600 text-white p-2 rounded-full hover:bg-green-500 w-10 h-10 flex items-center justify-center shadow-lg">
-                    <i class="fa-solid fa-user-plus"></i>
-                </button>
+                <div class="flex items-center gap-2">
+                    <button type="button" id="btn-history" aria-label="Histórico de rodadas"
+                        class="bg-green-700 text-white p-2 rounded-full hover:bg-green-600 active:scale-95 transition-all w-10 h-10 flex items-center justify-center shadow-lg focus:ring-2 focus:ring-green-300 focus:outline-none min-h-[44px]">
+                        <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i>
+                    </button>
+                    <button type="button" id="btn-add-player" aria-label="Adicionar jogador"
+                        class="bg-green-600 text-white p-2 rounded-full hover:bg-green-500 active:scale-95 transition-all w-10 h-10 flex items-center justify-center shadow-lg focus:ring-2 focus:ring-green-300 focus:outline-none min-h-[44px]">
+                        <i class="fa-solid fa-user-plus" aria-hidden="true"></i>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Banner de vencedor -->
+            <div id="winner-banner" class="hidden bg-yellow-400 text-yellow-900 text-center py-3 px-4 font-bold animate-pulse-once">
+                <i class="fa-solid fa-trophy mr-2" aria-hidden="true"></i>
+                <span id="winner-name"></span> VENCEU!
+                <i class="fa-solid fa-trophy ml-2" aria-hidden="true"></i>
             </div>
 
-            <div id="players-list" class="flex-grow overflow-y-auto p-4 space-y-3 pb-24">
+            <div id="players-list" class="flex-grow overflow-y-auto p-4 pb-24 grid grid-cols-1 md:grid-cols-2 gap-3 content-start">
             </div>
 
-            <div class="p-4 bg-green-800 sticky bottom-0 w-full">
-                <button id="btn-end-round" onclick="openEndRoundModal()"
-                    class="w-full bg-yellow-500 text-black font-bold py-4 rounded-lg shadow-xl hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed">
+            <footer class="p-4 bg-green-800 sticky bottom-0 w-full safe-bottom">
+                <div id="round-counter" class="text-center text-green-300 text-xs mb-2 font-medium"></div>
+                <button type="button" id="btn-end-round"
+                    class="w-full bg-yellow-500 text-black font-bold py-4 rounded-lg shadow-xl hover:bg-yellow-400 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed focus:ring-4 focus:ring-yellow-300 focus:outline-none min-h-[44px]">
                     FECHAR RODADA
                 </button>
-            </div>
-        </div>
+            </footer>
+        </section>
 
-    </div>
+    </main>
 
-    <div id="modal-add-player"
-        class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div class="bg-white rounded-lg p-6 w-full max-w-sm">
+    <!-- Modal: Adicionar Jogador -->
+    <dialog id="modal-add-player" class="w-full max-w-sm md:max-w-md rounded-lg">
+        <div class="bg-white rounded-lg p-6">
             <h2 class="text-xl font-bold mb-4">Novo Jogador</h2>
-            <input type="text" id="new-player-name" class="w-full border p-2 rounded mb-4 uppercase" placeholder="Nome">
+            <label for="new-player-name" class="sr-only">Nome do jogador</label>
+            <input type="text" id="new-player-name"
+                class="w-full border-2 border-gray-200 p-3 rounded-lg mb-4 uppercase focus:border-green-500 focus:ring-2 focus:ring-green-300 focus:outline-none min-h-[44px]"
+                placeholder="Nome do jogador" maxlength="20" autocomplete="off">
             <div class="flex justify-end gap-2">
-                <button onclick="closeModal('modal-add-player')" class="px-4 py-2 text-gray-600">Cancelar</button>
-                <button onclick="confirmAddPlayer()"
-                    class="px-4 py-2 bg-green-600 text-white rounded font-bold">Adicionar</button>
+                <button type="button" id="btn-cancel-add"
+                    class="px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-all focus:ring-2 focus:ring-gray-300 focus:outline-none min-h-[44px]">
+                    Cancelar
+                </button>
+                <button type="button" id="btn-confirm-add"
+                    class="px-4 py-2 bg-green-600 text-white rounded font-bold hover:bg-green-700 active:scale-95 transition-all focus:ring-2 focus:ring-green-300 focus:outline-none min-h-[44px]">
+                    Adicionar
+                </button>
             </div>
         </div>
-    </div>
+    </dialog>
 
-    <div id="modal-end-round"
-        class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div class="bg-white rounded-lg p-6 w-full max-w-sm max-h-[80vh] flex flex-col">
+    <!-- Modal: Fim da Rodada -->
+    <dialog id="modal-end-round" class="w-full max-w-sm md:max-w-md rounded-lg">
+        <div class="bg-white rounded-lg p-6 max-h-[80vh] flex flex-col">
             <h2 class="text-xl font-bold mb-2">Fim da Rodada</h2>
-            <p class="text-sm text-gray-600 mb-4">Quantos pontos cada um PERDEU?</p>
+            <p class="text-sm text-gray-600 mb-4">Quantos pontos cada um <strong>PERDEU</strong>?</p>
 
             <div id="round-inputs" class="overflow-y-auto flex-grow mb-4 space-y-2">
             </div>
 
             <div class="flex justify-end gap-2 mt-auto">
-                <button onclick="closeModal('modal-end-round')" class="px-4 py-2 text-gray-600">Cancelar</button>
-                <button onclick="processRound()"
-                    class="px-4 py-2 bg-green-600 text-white rounded font-bold">Processar</button>
+                <button type="button" id="btn-cancel-round"
+                    class="px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-all focus:ring-2 focus:ring-gray-300 focus:outline-none min-h-[44px]">
+                    Cancelar
+                </button>
+                <button type="button" id="btn-process-round"
+                    class="px-4 py-2 bg-green-600 text-white rounded font-bold hover:bg-green-700 active:scale-95 transition-all focus:ring-2 focus:ring-green-300 focus:outline-none min-h-[44px]">
+                    Processar
+                </button>
             </div>
         </div>
-    </div>
+    </dialog>
 
-    <script>
-        // --- ESTADO DO JOGO ---
-        let players = [];
-        let config = { entry: 0, rebuy: 0 };
+    <!-- Modal: Confirmação (Estouro/Rebuy) -->
+    <dialog id="modal-confirm" class="w-full max-w-sm md:max-w-md rounded-lg">
+        <div class="bg-white rounded-lg p-6 text-center">
+            <div id="confirm-icon" class="text-5xl mb-4">
+                <i class="fa-solid fa-explosion text-red-500" aria-hidden="true"></i>
+            </div>
+            <h2 id="confirm-title" class="text-xl font-bold mb-2">Confirmação</h2>
+            <p id="confirm-message" class="text-gray-600 mb-6"></p>
+            <div class="flex justify-center gap-3">
+                <button type="button" id="btn-confirm-no"
+                    class="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-bold hover:bg-gray-300 active:scale-95 transition-all focus:ring-2 focus:ring-gray-300 focus:outline-none min-h-[44px]">
+                    Não
+                </button>
+                <button type="button" id="btn-confirm-yes"
+                    class="px-6 py-3 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 active:scale-95 transition-all focus:ring-2 focus:ring-green-300 focus:outline-none min-h-[44px]">
+                    Sim
+                </button>
+            </div>
+        </div>
+    </dialog>
 
-        // --- NAVEGAÇÃO E SETUP ---
-        function startGame() {
-            const entryInput = document.getElementById('entry-fee').value;
-            const rebuyInput = document.getElementById('rebuy-fee').value;
+    <!-- Modal: Histórico de Rodadas -->
+    <dialog id="modal-history" class="w-full max-w-sm md:max-w-md rounded-lg">
+        <div class="bg-white rounded-lg p-6 max-h-[80vh] flex flex-col">
+            <h2 class="text-xl font-bold mb-4">
+                <i class="fa-solid fa-clock-rotate-left text-green-600 mr-2" aria-hidden="true"></i>
+                Histórico de Rodadas
+            </h2>
+            <div id="history-content" class="overflow-y-auto flex-grow mb-4 space-y-3">
+            </div>
+            <button type="button" id="btn-close-history"
+                class="w-full py-3 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 active:scale-95 transition-all focus:ring-2 focus:ring-green-300 focus:outline-none min-h-[44px]">
+                Fechar
+            </button>
+        </div>
+    </dialog>
 
-            if (!entryInput || !rebuyInput) {
-                alert("Preencha os valores de entrada e reentrada!");
-                return;
-            }
-
-            config.entry = parseFloat(entryInput);
-            config.rebuy = parseFloat(rebuyInput);
-
-            document.getElementById('setup-screen').classList.add('hidden');
-            document.getElementById('game-screen').classList.replace('hidden', 'flex');
-
-            renderGame();
-        }
-
-        // --- LÓGICA CORE ---
-
-        function getLowestScore() {
-            const activePlayers = players.filter(p => !p.eliminated && p.score >= 0);
-            if (activePlayers.length === 0) return 99;
-            return Math.min(...activePlayers.map(p => p.score));
-        }
-
-        function confirmAddPlayer() {
-            const nameInput = document.getElementById('new-player-name');
-            const name = nameInput.value.trim();
-            if (!name) return;
-
-            // Regra: Entra com a menor pontuação ou 99
-            const startScore = (players.length > 0) ? getLowestScore() : 99;
-
-            players.push({
-                id: Date.now(), // ID único
-                name: name,
-                score: startScore,
-                debt: config.entry,
-                hasPaid: false,
-                eliminated: false
-            });
-
-            nameInput.value = '';
-            closeModal('modal-add-player');
-            renderGame();
-        }
-
-        function togglePayment(id) {
-            const player = players.find(p => p.id === id);
-            if (player && player.debt > 0) {
-                player.hasPaid = !player.hasPaid;
-                renderGame();
-            }
-        }
-
-        // --- LÓGICA DA RODADA ---
-
-        function openEndRoundModal() {
-            const container = document.getElementById('round-inputs');
-            container.innerHTML = '';
-
-            players.filter(p => !p.eliminated).forEach(p => {
-                container.innerHTML += `
-                    <div class="flex items-center justify-between bg-gray-50 p-2 rounded">
-                        <span class="font-bold text-gray-700">${p.name}</span>
-                        <input type="number" id="input-${p.id}" class="w-20 border rounded p-1 text-center" placeholder="0">
-                    </div>
-                `;
-            });
-
-            document.getElementById('modal-end-round').classList.remove('hidden');
-        }
-
-        function processRound() {
-            // 1. Atualizar Pontos
-            players.forEach(p => {
-                if (!p.eliminated) {
-                    const input = document.getElementById(`input-${p.id}`);
-                    if (input) {
-                        const lost = parseInt(input.value) || 0;
-                        p.score -= lost;
-                    }
-                }
-            });
-
-            closeModal('modal-end-round');
-            checkEstouros();
-            renderGame();
-        }
-
-        // --- LÓGICA DE ESTOURO E REBUY ---
-
-        async function checkEstouros() {
-            for (let player of players) {
-                if (!player.eliminated && player.score < 0) {
-                    // Checa sobreviventes (incluindo o ganhador)
-                    const survivors = players.filter(p => p.score >= 0).length;
-
-                    if (survivors >= 1) {
-                        // REBUY FLOW
-                        if (confirm(`${player.name} ESTOUROU com ${player.score} pontos!\n\nDeseja pagar a volta (R$ ${config.rebuy.toFixed(2)})?`)) {
-                            // Sim: Pega menor pontuação positiva (excluindo ele mesmo pois está negativo)
-                            const targetScore = players
-                                .filter(p => p.score >= 0 && p.id !== player.id)
-                                .map(p => p.score)
-                                .reduce((min, cur) => Math.min(min, cur), 99);
-
-                            player.score = targetScore;
-                            player.debt += config.rebuy;
-                            player.hasPaid = false;
-                        } else {
-                            player.eliminated = true;
-                        }
-                    } else {
-                        // Game Over direto
-                        alert(`${player.name} foi eliminado!`);
-                        player.eliminated = true;
-                    }
-                }
-            }
-            renderGame();
-        }
-
-        // --- RENDERIZAÇÃO (UI) ---
-
-        function renderGame() {
-            // Atualiza Pote
-            const totalPot = players.reduce((sum, p) => sum + p.debt, 0);
-            document.getElementById('total-pot').innerText = totalPot.toFixed(2);
-
-            // Renderiza Lista
-            const list = document.getElementById('players-list');
-            list.innerHTML = '';
-
-            if (players.length === 0) {
-                list.innerHTML = '<div class="text-center text-white opacity-70 mt-10">Adicione jogadores para começar!</div>';
-            }
-
-            players.forEach(p => {
-                const cardColor = p.eliminated ? 'bg-gray-400' : 'bg-white';
-                const scoreColor = p.score < 0 ? 'bg-red-500 text-white' : 'bg-green-100 text-green-800';
-                const moneyIcon = p.hasPaid ? 'text-green-600 fa-circle-check' : 'text-red-500 fa-sack-dollar';
-                const moneyText = p.hasPaid ? 'Pago' : `Deve R$ ${p.debt.toFixed(2)}`;
-                const textColor = p.eliminated ? 'line-through text-gray-600' : 'text-gray-800';
-
-                const html = `
-                <div class="${cardColor} rounded-xl shadow p-3 flex items-center justify-between transition-all">
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ${p.eliminated ? 'bg-black text-white' : scoreColor}">
-                            ${p.eliminated ? '<i class="fa-solid fa-skull"></i>' : p.score}
-                        </div>
-                        <div>
-                            <div class="font-bold ${textColor}">${p.name}</div>
-                            ${!p.eliminated && p.debt > 0 ? `<div class="text-xs text-gray-500">${moneyText}</div>` : ''}
-                        </div>
-                    </div>
-                    
-                    ${!p.eliminated ? `
-                    <button onclick="togglePayment(${p.id})" class="text-2xl hover:scale-110 transition">
-                        <i class="fa-solid ${moneyIcon}"></i>
-                    </button>
-                    ` : ''}
-                </div>`;
-                list.innerHTML += html;
-            });
-
-            // Controla botão de fechar rodada
-            const activeCount = players.filter(p => !p.eliminated).length;
-            document.getElementById('btn-end-round').disabled = activeCount < 2;
-        }
-
-        // --- UTILITÁRIOS ---
-        function openAddPlayerModal() {
-            document.getElementById('modal-add-player').classList.remove('hidden');
-            document.getElementById('new-player-name').focus();
-        }
-
-        function closeModal(id) {
-            document.getElementById(id).classList.add('hidden');
-        }
-    </script>
+    <!-- App JavaScript -->
+    <script src="app.js"></script>
 </body>
 
 </html>

@@ -1,0 +1,47 @@
+/* =============================================
+   Pontinho Master - Estilos Customizados
+   ============================================= */
+
+/* --- Dialog/Modal --- */
+dialog::backdrop {
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(2px);
+}
+
+dialog {
+    border: none;
+    padding: 0;
+    background: transparent;
+    max-width: 90vw;
+}
+
+dialog[open] {
+    animation: fadeIn 0.2s ease-out;
+}
+
+/* --- Safe Areas (dispositivos com notch) --- */
+@supports (padding: env(safe-area-inset-bottom)) {
+    .safe-bottom {
+        padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+    }
+
+    .safe-top {
+        padding-top: env(safe-area-inset-top);
+    }
+}
+
+/* --- Player Cards --- */
+.player-card {
+    transition: all 0.3s ease;
+}
+
+.player-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* --- Number Input Spinners --- */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+    opacity: 1;
+}
