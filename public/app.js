@@ -253,10 +253,10 @@ const App = (() => {
         activePlayers.forEach(p => {
             const safeName = escapeHtml(p.name);
             html += `
-                <div class="flex items-center gap-3 bg-gray-50 p-3 rounded-lg">
-                    <span class="font-bold text-gray-700 truncate min-w-0 flex-1">${safeName}</span>
+                <div class="flex items-center gap-3 bg-gray-50 p-4 rounded-xl">
+                    <span class="font-bold text-gray-700 text-base truncate min-w-0 flex-1">${safeName}</span>
                     <input type="number" data-player-id="${p.id}" min="0"
-                        class="round-score-input shrink-0 w-20 border-2 border-gray-200 rounded-lg p-2 text-center focus:border-green-500 focus:ring-2 focus:ring-green-300 focus:outline-none min-h-[44px]"
+                        class="round-score-input shrink-0 w-24 border-2 border-gray-200 rounded-lg p-3 text-center text-lg focus:border-green-500 focus:ring-2 focus:ring-green-300 focus:outline-none min-h-[48px]"
                         placeholder="0" inputmode="numeric">
                 </div>
             `;
@@ -412,10 +412,10 @@ const App = (() => {
 
         if (sorted.length === 0) {
             list.innerHTML = `
-                <div class="col-span-full text-center text-white opacity-70 mt-10 animate-fade-in">
-                    <i class="fa-solid fa-users text-5xl mb-4 block" aria-hidden="true"></i>
-                    <p class="text-lg">Adicione jogadores para começar!</p>
-                    <p class="text-sm mt-2 opacity-70">Toque no botão <i class="fa-solid fa-user-plus" aria-hidden="true"></i> acima</p>
+                <div class="col-span-full text-center text-white opacity-70 mt-16 animate-fade-in">
+                    <i class="fa-solid fa-users text-6xl mb-4 block" aria-hidden="true"></i>
+                    <p class="text-xl">Adicione jogadores para começar!</p>
+                    <p class="text-base mt-2 opacity-70">Toque no botão <i class="fa-solid fa-user-plus" aria-hidden="true"></i> acima</p>
                 </div>`;
         } else {
             let html = '';
@@ -429,18 +429,18 @@ const App = (() => {
                 const safeName = escapeHtml(p.name);
 
                 html += `
-                <div class="player-card ${cardColor} rounded-xl shadow p-3 flex items-center gap-3 animate-slide-up" style="animation-delay: ${index * 0.05}s">
-                    <div class="shrink-0 w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ${p.eliminated ? 'bg-black text-white' : isWinner ? 'bg-yellow-400 text-yellow-900' : scoreColor}">
+                <div class="player-card ${cardColor} rounded-2xl shadow-md p-4 flex items-center gap-3 animate-slide-up" style="animation-delay: ${index * 0.05}s">
+                    <div class="shrink-0 w-12 h-12 rounded-full flex items-center justify-center font-bold text-base ${p.eliminated ? 'bg-black text-white' : isWinner ? 'bg-yellow-400 text-yellow-900' : scoreColor}">
                         ${p.eliminated ? '<i class="fa-solid fa-skull" aria-hidden="true"></i>' : isWinner ? '<i class="fa-solid fa-crown" aria-hidden="true"></i>' : p.score}
                     </div>
                     <div class="min-w-0 flex-1">
-                        <div class="font-bold ${textColor} text-sm truncate">${safeName}</div>
-                        ${!p.eliminated && p.debt > 0 ? `<div class="text-xs text-gray-500 truncate">${moneyText}</div>` : ''}
-                        ${isWinner ? '<div class="text-xs text-yellow-600 font-bold">Vencedor!</div>' : ''}
+                        <div class="font-bold ${textColor} text-base truncate">${safeName}</div>
+                        ${!p.eliminated && p.debt > 0 ? `<div class="text-sm text-gray-500 truncate">${moneyText}</div>` : ''}
+                        ${isWinner ? '<div class="text-sm text-yellow-600 font-bold">Vencedor!</div>' : ''}
                     </div>
                     ${!p.eliminated ? `
                     <button type="button" data-toggle-payment="${p.id}"
-                        class="shrink-0 text-2xl active:scale-90 transition-all focus:ring-2 focus:ring-green-300 focus:outline-none rounded-full min-h-[44px] min-w-[44px] flex items-center justify-center"
+                        class="shrink-0 text-3xl active:scale-90 transition-all focus:ring-2 focus:ring-green-300 focus:outline-none rounded-full min-h-[48px] min-w-[48px] flex items-center justify-center"
                         aria-label="${p.hasPaid ? 'Desmarcar pagamento de ' + safeName : 'Marcar pagamento de ' + safeName}">
                         <i class="fa-solid ${moneyIcon}" aria-hidden="true"></i>
                     </button>
