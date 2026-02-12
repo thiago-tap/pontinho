@@ -1,37 +1,55 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pontinho Master</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
+
     <style>
         /* Animações simples */
-        .fade-in { animation: fadeIn 0.3s ease-in-out; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
     </style>
 </head>
+
 <body class="bg-green-800 text-gray-800 font-sans min-h-screen flex flex-col">
 
     <div id="app" class="flex-grow flex flex-col max-w-md mx-auto w-full bg-green-800 shadow-2xl min-h-screen relative">
-        
+
         <div id="setup-screen" class="flex flex-col items-center justify-center p-6 flex-grow fade-in">
             <i class="fa-solid fa-layer-group text-white text-6xl mb-4"></i>
             <h1 class="text-4xl font-bold text-white mb-8">PONTINHO</h1>
-            
+
             <div class="w-full bg-white rounded-xl shadow-lg p-4 mb-4">
                 <label class="block text-gray-600 text-sm font-bold mb-2">Valor da Entrada (R$)</label>
-                <input type="number" id="entry-fee" class="w-full text-lg p-2 border-b-2 border-green-500 outline-none focus:bg-green-50" placeholder="0.00">
+                <input type="number" id="entry-fee"
+                    class="w-full text-lg p-2 border-b-2 border-green-500 outline-none focus:bg-green-50"
+                    placeholder="0.00">
             </div>
 
             <div class="w-full bg-white rounded-xl shadow-lg p-4 mb-8">
                 <label class="block text-gray-600 text-sm font-bold mb-2">Valor da Reentrada (R$)</label>
-                <input type="number" id="rebuy-fee" class="w-full text-lg p-2 border-b-2 border-green-500 outline-none focus:bg-green-50" placeholder="0.00">
+                <input type="number" id="rebuy-fee"
+                    class="w-full text-lg p-2 border-b-2 border-green-500 outline-none focus:bg-green-50"
+                    placeholder="0.00">
             </div>
 
-            <button onclick="startGame()" class="bg-white text-green-900 font-bold py-4 px-12 rounded-full shadow-lg hover:bg-gray-100 transition transform hover:scale-105">
+            <button onclick="startGame()"
+                class="bg-white text-green-900 font-bold py-4 px-12 rounded-full shadow-lg hover:bg-gray-100 transition transform hover:scale-105">
                 ABRIR MESA
             </button>
         </div>
@@ -41,16 +59,18 @@
                 <div class="text-white font-bold text-xl">
                     Pote: R$ <span id="total-pot">0.00</span>
                 </div>
-                <button onclick="openAddPlayerModal()" class="bg-green-600 text-white p-2 rounded-full hover:bg-green-500 w-10 h-10 flex items-center justify-center shadow-lg">
+                <button onclick="openAddPlayerModal()"
+                    class="bg-green-600 text-white p-2 rounded-full hover:bg-green-500 w-10 h-10 flex items-center justify-center shadow-lg">
                     <i class="fa-solid fa-user-plus"></i>
                 </button>
             </div>
 
             <div id="players-list" class="flex-grow overflow-y-auto p-4 space-y-3 pb-24">
-                </div>
+            </div>
 
             <div class="p-4 bg-green-800 sticky bottom-0 w-full">
-                <button id="btn-end-round" onclick="openEndRoundModal()" class="w-full bg-yellow-500 text-black font-bold py-4 rounded-lg shadow-xl hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed">
+                <button id="btn-end-round" onclick="openEndRoundModal()"
+                    class="w-full bg-yellow-500 text-black font-bold py-4 rounded-lg shadow-xl hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed">
                     FECHAR RODADA
                 </button>
             </div>
@@ -58,28 +78,32 @@
 
     </div>
 
-    <div id="modal-add-player" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div id="modal-add-player"
+        class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
         <div class="bg-white rounded-lg p-6 w-full max-w-sm">
             <h2 class="text-xl font-bold mb-4">Novo Jogador</h2>
             <input type="text" id="new-player-name" class="w-full border p-2 rounded mb-4 uppercase" placeholder="Nome">
             <div class="flex justify-end gap-2">
                 <button onclick="closeModal('modal-add-player')" class="px-4 py-2 text-gray-600">Cancelar</button>
-                <button onclick="confirmAddPlayer()" class="px-4 py-2 bg-green-600 text-white rounded font-bold">Adicionar</button>
+                <button onclick="confirmAddPlayer()"
+                    class="px-4 py-2 bg-green-600 text-white rounded font-bold">Adicionar</button>
             </div>
         </div>
     </div>
 
-    <div id="modal-end-round" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div id="modal-end-round"
+        class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
         <div class="bg-white rounded-lg p-6 w-full max-w-sm max-h-[80vh] flex flex-col">
             <h2 class="text-xl font-bold mb-2">Fim da Rodada</h2>
             <p class="text-sm text-gray-600 mb-4">Quantos pontos cada um PERDEU?</p>
-            
+
             <div id="round-inputs" class="overflow-y-auto flex-grow mb-4 space-y-2">
-                </div>
+            </div>
 
             <div class="flex justify-end gap-2 mt-auto">
                 <button onclick="closeModal('modal-end-round')" class="px-4 py-2 text-gray-600">Cancelar</button>
-                <button onclick="processRound()" class="px-4 py-2 bg-green-600 text-white rounded font-bold">Processar</button>
+                <button onclick="processRound()"
+                    class="px-4 py-2 bg-green-600 text-white rounded font-bold">Processar</button>
             </div>
         </div>
     </div>
@@ -104,7 +128,7 @@
 
             document.getElementById('setup-screen').classList.add('hidden');
             document.getElementById('game-screen').classList.replace('hidden', 'flex');
-            
+
             renderGame();
         }
 
@@ -188,7 +212,7 @@
                 if (!player.eliminated && player.score < 0) {
                     // Checa sobreviventes (incluindo o ganhador)
                     const survivors = players.filter(p => p.score >= 0).length;
-                    
+
                     if (survivors >= 1) {
                         // REBUY FLOW
                         if (confirm(`${player.name} ESTOUROU com ${player.score} pontos!\n\nDeseja pagar a volta (R$ ${config.rebuy.toFixed(2)})?`)) {
@@ -197,7 +221,7 @@
                                 .filter(p => p.score >= 0 && p.id !== player.id)
                                 .map(p => p.score)
                                 .reduce((min, cur) => Math.min(min, cur), 99);
-                            
+
                             player.score = targetScore;
                             player.debt += config.rebuy;
                             player.hasPaid = false;
@@ -273,4 +297,5 @@
         }
     </script>
 </body>
+
 </html>
