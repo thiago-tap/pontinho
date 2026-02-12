@@ -60,41 +60,41 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 
-<body class="bg-green-900 text-gray-800 font-sans min-h-screen flex flex-col">
+<body class="bg-green-800 md:bg-green-900 text-gray-800 font-sans min-h-screen flex flex-col">
 
     <!-- Toast Notifications -->
-    <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-2 w-[90%] max-w-sm pointer-events-none" role="status" aria-live="polite"></div>
+    <div id="toast-container" class="fixed top-4 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-2 w-[90%] max-w-md pointer-events-none" role="status" aria-live="polite"></div>
 
-    <main id="app" class="flex-grow flex flex-col w-full max-w-md md:max-w-lg lg:max-w-xl mx-auto bg-green-800 shadow-2xl min-h-screen relative">
+    <main id="app" class="flex-grow flex flex-col w-full md:w-[85%] lg:w-[70%] mx-auto bg-green-800 md:shadow-2xl md:rounded-t-none min-h-screen relative">
 
         <!-- Tela de Setup -->
-        <section id="setup-screen" class="flex flex-col items-center justify-center p-6 md:p-10 flex-grow animate-fade-in" aria-label="Configurar mesa">
-            <i class="fa-solid fa-layer-group text-white text-5xl md:text-6xl mb-4" aria-hidden="true"></i>
-            <h1 class="text-3xl md:text-4xl font-bold text-white mb-8">PONTINHO</h1>
+        <section id="setup-screen" class="flex flex-col items-center justify-center px-6 py-10 md:p-12 lg:p-16 flex-grow animate-fade-in" aria-label="Configurar mesa">
+            <i class="fa-solid fa-layer-group text-white text-6xl lg:text-7xl mb-4" aria-hidden="true"></i>
+            <h1 class="text-4xl lg:text-5xl font-bold text-white mb-10">PONTINHO</h1>
 
-            <div class="w-full bg-white rounded-xl shadow-lg p-4 mb-4">
-                <label for="entry-fee" class="block text-gray-600 text-sm font-bold mb-2">Valor da Entrada (R$)</label>
+            <div class="w-full max-w-md bg-white rounded-xl shadow-lg p-5 mb-4">
+                <label for="entry-fee" class="block text-gray-600 text-sm lg:text-base font-bold mb-2">Valor da Entrada (R$)</label>
                 <input type="number" id="entry-fee" min="0" step="0.01"
-                    class="w-full text-lg p-2 border-b-2 border-green-500 outline-none focus:bg-green-50 focus:ring-2 focus:ring-green-300 rounded min-h-[44px]"
+                    class="w-full text-lg p-3 border-b-2 border-green-500 outline-none focus:bg-green-50 focus:ring-2 focus:ring-green-300 rounded min-h-[48px]"
                     placeholder="0.00" inputmode="decimal">
             </div>
 
-            <div class="w-full bg-white rounded-xl shadow-lg p-4 mb-8">
-                <label for="rebuy-fee" class="block text-gray-600 text-sm font-bold mb-2">Valor da Reentrada (R$)</label>
+            <div class="w-full max-w-md bg-white rounded-xl shadow-lg p-5 mb-10">
+                <label for="rebuy-fee" class="block text-gray-600 text-sm lg:text-base font-bold mb-2">Valor da Reentrada (R$)</label>
                 <input type="number" id="rebuy-fee" min="0" step="0.01"
-                    class="w-full text-lg p-2 border-b-2 border-green-500 outline-none focus:bg-green-50 focus:ring-2 focus:ring-green-300 rounded min-h-[44px]"
+                    class="w-full text-lg p-3 border-b-2 border-green-500 outline-none focus:bg-green-50 focus:ring-2 focus:ring-green-300 rounded min-h-[48px]"
                     placeholder="0.00" inputmode="decimal">
             </div>
 
             <button type="button" id="btn-start-game"
-                class="bg-white text-green-900 font-bold py-4 px-12 rounded-full shadow-lg hover:bg-gray-100 active:scale-95 transition-all focus:ring-4 focus:ring-green-300 focus:outline-none min-h-[44px]">
+                class="w-full max-w-md bg-white text-green-900 font-bold py-4 rounded-full shadow-lg hover:bg-gray-100 active:scale-95 transition-all focus:ring-4 focus:ring-green-300 focus:outline-none min-h-[52px] text-lg">
                 ABRIR MESA
             </button>
         </section>
 
         <!-- Tela do Jogo -->
-        <section id="game-screen" class="hidden flex-col h-screen animate-fade-in" aria-label="Jogo em andamento">
-            <header class="bg-green-900 p-4 shadow-md flex justify-between items-center sticky top-0 z-10 safe-top">
+        <section id="game-screen" class="hidden flex-col min-h-screen animate-fade-in" aria-label="Jogo em andamento">
+            <header class="bg-green-900 px-4 py-3 md:px-6 shadow-md flex justify-between items-center sticky top-0 z-10 safe-top">
                 <div class="flex items-center gap-3">
                     <button type="button" id="btn-new-game" aria-label="Nova mesa"
                         class="text-white hover:text-yellow-300 active:scale-95 transition-all focus:ring-2 focus:ring-yellow-300 focus:outline-none rounded-full w-10 h-10 flex items-center justify-center min-h-[44px]">
@@ -117,19 +117,19 @@
             </header>
 
             <!-- Banner de vencedor -->
-            <div id="winner-banner" class="hidden bg-yellow-400 text-yellow-900 text-center py-3 px-4 font-bold animate-pulse-once">
+            <div id="winner-banner" class="hidden bg-yellow-400 text-yellow-900 text-center py-3 px-4 font-bold text-base md:text-lg animate-pulse-once">
                 <i class="fa-solid fa-trophy mr-2" aria-hidden="true"></i>
                 <span id="winner-name"></span> VENCEU!
                 <i class="fa-solid fa-trophy ml-2" aria-hidden="true"></i>
             </div>
 
-            <div id="players-list" class="flex-grow overflow-y-auto p-4 pb-24 grid grid-cols-1 md:grid-cols-2 gap-3 content-start">
+            <div id="players-list" class="flex-grow overflow-y-auto p-4 md:p-6 pb-24 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 content-start">
             </div>
 
-            <footer class="p-4 bg-green-800 sticky bottom-0 w-full safe-bottom">
+            <footer class="px-4 py-3 md:px-6 bg-green-800 sticky bottom-0 w-full safe-bottom">
                 <div id="round-counter" class="text-center text-green-300 text-xs mb-2 font-medium"></div>
                 <button type="button" id="btn-end-round"
-                    class="w-full bg-yellow-500 text-black font-bold py-4 rounded-lg shadow-xl hover:bg-yellow-400 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed focus:ring-4 focus:ring-yellow-300 focus:outline-none min-h-[44px]">
+                    class="w-full bg-yellow-500 text-black font-bold py-4 rounded-lg shadow-xl hover:bg-yellow-400 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed focus:ring-4 focus:ring-yellow-300 focus:outline-none min-h-[44px] text-base md:text-lg">
                     FECHAR RODADA
                 </button>
             </footer>
@@ -138,7 +138,7 @@
     </main>
 
     <!-- Modal: Adicionar Jogador -->
-    <dialog id="modal-add-player" class="w-full max-w-sm md:max-w-md rounded-lg">
+    <dialog id="modal-add-player" class="w-full max-w-md rounded-lg">
         <div class="bg-white rounded-lg p-6">
             <h2 class="text-xl font-bold mb-4">Novo Jogador</h2>
             <label for="new-player-name" class="sr-only">Nome do jogador</label>
@@ -159,7 +159,7 @@
     </dialog>
 
     <!-- Modal: Fim da Rodada -->
-    <dialog id="modal-end-round" class="w-full max-w-sm md:max-w-md rounded-lg">
+    <dialog id="modal-end-round" class="w-full max-w-md rounded-lg">
         <div class="bg-white rounded-lg p-6 max-h-[80vh] flex flex-col">
             <h2 class="text-xl font-bold mb-2">Fim da Rodada</h2>
             <p class="text-sm text-gray-600 mb-4">Quantos pontos cada um <strong>PERDEU</strong>?</p>
@@ -181,7 +181,7 @@
     </dialog>
 
     <!-- Modal: Confirmação (Estouro/Rebuy) -->
-    <dialog id="modal-confirm" class="w-full max-w-sm md:max-w-md rounded-lg">
+    <dialog id="modal-confirm" class="w-full max-w-md rounded-lg">
         <div class="bg-white rounded-lg p-6 text-center">
             <div id="confirm-icon" class="text-5xl mb-4">
                 <i class="fa-solid fa-explosion text-red-500" aria-hidden="true"></i>
@@ -202,7 +202,7 @@
     </dialog>
 
     <!-- Modal: Histórico de Rodadas -->
-    <dialog id="modal-history" class="w-full max-w-sm md:max-w-md rounded-lg">
+    <dialog id="modal-history" class="w-full max-w-md rounded-lg">
         <div class="bg-white rounded-lg p-6 max-h-[80vh] flex flex-col">
             <h2 class="text-xl font-bold mb-4">
                 <i class="fa-solid fa-clock-rotate-left text-green-600 mr-2" aria-hidden="true"></i>

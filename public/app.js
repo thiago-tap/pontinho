@@ -253,10 +253,10 @@ const App = (() => {
         activePlayers.forEach(p => {
             const safeName = escapeHtml(p.name);
             html += `
-                <div class="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
-                    <span class="font-bold text-gray-700">${safeName}</span>
+                <div class="flex items-center gap-3 bg-gray-50 p-3 rounded-lg">
+                    <span class="font-bold text-gray-700 truncate min-w-0 flex-1">${safeName}</span>
                     <input type="number" data-player-id="${p.id}" min="0"
-                        class="round-score-input w-24 border-2 border-gray-200 rounded-lg p-2 text-center focus:border-green-500 focus:ring-2 focus:ring-green-300 focus:outline-none min-h-[44px]"
+                        class="round-score-input shrink-0 w-20 border-2 border-gray-200 rounded-lg p-2 text-center focus:border-green-500 focus:ring-2 focus:ring-green-300 focus:outline-none min-h-[44px]"
                         placeholder="0" inputmode="numeric">
                 </div>
             `;
@@ -361,9 +361,9 @@ const App = (() => {
                 Object.entries(round.scores).forEach(([id, lost]) => {
                     const name = escapeHtml(round.playerNames[id] || 'Desconhecido');
                     html += `
-                        <div class="flex justify-between text-sm py-1 border-b border-gray-100 last:border-0">
-                            <span class="text-gray-700">${name}</span>
-                            <span class="font-mono ${lost > 0 ? 'text-red-500' : 'text-gray-400'}">-${lost}</span>
+                        <div class="flex justify-between gap-2 text-sm py-1 border-b border-gray-100 last:border-0">
+                            <span class="text-gray-700 truncate min-w-0">${name}</span>
+                            <span class="font-mono shrink-0 ${lost > 0 ? 'text-red-500' : 'text-gray-400'}">-${lost}</span>
                         </div>`;
                 });
                 html += '</div>';
@@ -429,21 +429,18 @@ const App = (() => {
                 const safeName = escapeHtml(p.name);
 
                 html += `
-                <div class="player-card ${cardColor} rounded-xl shadow p-3 flex items-center justify-between animate-slide-up" style="animation-delay: ${index * 0.05}s">
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center font-bold text-sm md:text-base ${p.eliminated ? 'bg-black text-white' : isWinner ? 'bg-yellow-400 text-yellow-900' : scoreColor}">
-                            ${p.eliminated ? '<i class="fa-solid fa-skull" aria-hidden="true"></i>' : isWinner ? '<i class="fa-solid fa-crown" aria-hidden="true"></i>' : p.score}
-                        </div>
-                        <div>
-                            <div class="font-bold ${textColor} text-sm md:text-base">${safeName}</div>
-                            ${!p.eliminated && p.debt > 0 ? `<div class="text-xs text-gray-500">${moneyText}</div>` : ''}
-                            ${isWinner ? '<div class="text-xs text-yellow-600 font-bold">Vencedor!</div>' : ''}
-                        </div>
+                <div class="player-card ${cardColor} rounded-xl shadow p-3 flex items-center gap-3 animate-slide-up" style="animation-delay: ${index * 0.05}s">
+                    <div class="shrink-0 w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ${p.eliminated ? 'bg-black text-white' : isWinner ? 'bg-yellow-400 text-yellow-900' : scoreColor}">
+                        ${p.eliminated ? '<i class="fa-solid fa-skull" aria-hidden="true"></i>' : isWinner ? '<i class="fa-solid fa-crown" aria-hidden="true"></i>' : p.score}
                     </div>
-
+                    <div class="min-w-0 flex-1">
+                        <div class="font-bold ${textColor} text-sm truncate">${safeName}</div>
+                        ${!p.eliminated && p.debt > 0 ? `<div class="text-xs text-gray-500 truncate">${moneyText}</div>` : ''}
+                        ${isWinner ? '<div class="text-xs text-yellow-600 font-bold">Vencedor!</div>' : ''}
+                    </div>
                     ${!p.eliminated ? `
                     <button type="button" data-toggle-payment="${p.id}"
-                        class="text-2xl hover:scale-110 active:scale-95 transition-all focus:ring-2 focus:ring-green-300 focus:outline-none rounded-full p-1 min-h-[44px] min-w-[44px] flex items-center justify-center"
+                        class="shrink-0 text-2xl active:scale-90 transition-all focus:ring-2 focus:ring-green-300 focus:outline-none rounded-full min-h-[44px] min-w-[44px] flex items-center justify-center"
                         aria-label="${p.hasPaid ? 'Desmarcar pagamento de ' + safeName : 'Marcar pagamento de ' + safeName}">
                         <i class="fa-solid ${moneyIcon}" aria-hidden="true"></i>
                     </button>
