@@ -1,444 +1,487 @@
-'use strict';
+"use strict";
 
 // =============================================
 // Pontinho Master - Lógica do Jogo
 // =============================================
 
 const App = (() => {
-    // --- ESTADO ---
-    let players = [];
-    let config = { entry: 0, rebuy: 0 };
-    let roundHistory = [];
-    let currentRound = 0;
-    let nextId = 1;
-    let gameStarted = false;
-    let originalOrder = [];     // Ordem física da mesa (IDs dos jogadores)
-    let dealerIndex = 0;        // Índice em originalOrder para o dealer atual
-    let undoSnapshot = null;    // Último snapshot para desfazer
-    let confettiShown = false;  // Flag para não repetir confetti
+  // --- ESTADO ---
+  let players = [];
+  let config = { entry: 0, rebuy: 0 };
+  let roundHistory = [];
+  let currentRound = 0;
+  let nextId = 1;
+  let gameStarted = false;
+  let originalOrder = []; // Ordem física da mesa (IDs dos jogadores)
+  let dealerIndex = 0; // Índice em originalOrder para o dealer atual
+  let undoSnapshot = null; // Último snapshot para desfazer
+  let confettiShown = false; // Flag para não repetir confetti
 
-    // --- REFERÊNCIAS DOM ---
-    const $ = (id) => document.getElementById(id);
-    const setupScreen = $('setup-screen');
-    const gameScreen = $('game-screen');
-    const modeSelection = $('mode-selection');
-    const apostadoFields = $('apostado-fields');
-    const entryFeeInput = $('entry-fee');
-    const rebuyFeeInput = $('rebuy-fee');
-    const totalPotEl = $('total-pot');
-    const potContainer = $('pot-container');
-    const modeBadge = $('mode-badge');
-    const btnAddPlayer = $('btn-add-player');
-    const playersListEl = $('players-list');
-    const btnEndRound = $('btn-end-round');
-    const newPlayerNameInput = $('new-player-name');
-    const roundInputsEl = $('round-inputs');
-    const winnerBanner = $('winner-banner');
-    const winnerNameEl = $('winner-name');
-    const winnerProfitEl = $('winner-profit');
-    const roundCounterEl = $('round-counter');
-    const toastContainer = $('toast-container');
-    const btnUndo = $('btn-undo');
+  // --- REFERÊNCIAS DOM ---
+  const $ = (id) => document.getElementById(id);
+  const setupScreen = $("setup-screen");
+  const gameScreen = $("game-screen");
+  const modeSelection = $("mode-selection");
+  const apostadoFields = $("apostado-fields");
+  const entryFeeInput = $("entry-fee");
+  const rebuyFeeInput = $("rebuy-fee");
+  const totalPotEl = $("total-pot");
+  const potContainer = $("pot-container");
+  const modeBadge = $("mode-badge");
+  const btnAddPlayer = $("btn-add-player");
+  const playersListEl = $("players-list");
+  const btnEndRound = $("btn-end-round");
+  const newPlayerNameInput = $("new-player-name");
+  const roundInputsEl = $("round-inputs");
+  const winnerBanner = $("winner-banner");
+  const winnerNameEl = $("winner-name");
+  const winnerProfitEl = $("winner-profit");
+  const roundCounterEl = $("round-counter");
+  const toastContainer = $("toast-container");
+  const btnUndo = $("btn-undo");
 
-    const modalAddPlayer = $('modal-add-player');
-    const modalEndRound = $('modal-end-round');
-    const modalConfirm = $('modal-confirm');
-    const modalHistory = $('modal-history');
-    const modalHelp = $('modal-help');
+  const modalAddPlayer = $("modal-add-player");
+  const modalEndRound = $("modal-end-round");
+  const modalConfirm = $("modal-confirm");
+  const modalHistory = $("modal-history");
+  const modalHelp = $("modal-help");
 
-    // =============================================
-    // UTILITÁRIOS
-    // =============================================
+  // =============================================
+  // UTILITÁRIOS
+  // =============================================
 
-    function escapeHtml(str) {
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
-    }
+  function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
+  }
 
-    /** Modo amistoso: sem cobranças quando entrada e reentrada são R$ 0,00 */
-    function isAmistoso() {
-        return config.entry === 0 && config.rebuy === 0;
-    }
+  /** Modo amistoso: sem cobranças quando entrada e reentrada são R$ 0,00 */
+  function isAmistoso() {
+    return config.entry === 0 && config.rebuy === 0;
+  }
 
-    function showToast(message, type = 'info') {
-        const colors = {
-            info: 'bg-blue-500',
-            success: 'bg-green-600',
-            warning: 'bg-yellow-500 text-black',
-            error: 'bg-red-500',
-        };
-        const toast = document.createElement('div');
-        toast.className = `${colors[type] || colors.info} text-white px-4 py-3 rounded-lg shadow-lg text-sm font-medium text-center animate-toast-in pointer-events-auto`;
-        toast.textContent = message;
-        toastContainer.appendChild(toast);
+  function showToast(message, type = "info") {
+    const colors = {
+      info: "bg-blue-500",
+      success: "bg-green-600",
+      warning: "bg-yellow-500 text-black",
+      error: "bg-red-500",
+    };
+    const toast = document.createElement("div");
+    toast.className = `${colors[type] || colors.info} text-white px-4 py-3 rounded-lg shadow-lg text-sm font-medium text-center animate-toast-in pointer-events-auto`;
+    toast.textContent = message;
+    toastContainer.appendChild(toast);
 
-        setTimeout(() => {
-            toast.classList.remove('animate-toast-in');
-            toast.classList.add('animate-toast-out');
-            toast.addEventListener('animationend', () => toast.remove());
-        }, 2500);
-    }
+    setTimeout(() => {
+      toast.classList.remove("animate-toast-in");
+      toast.classList.add("animate-toast-out");
+      toast.addEventListener("animationend", () => toast.remove());
+    }, 2500);
+  }
 
-    function showConfirm(title, message) {
-        return new Promise((resolve) => {
-            $('confirm-title').textContent = title;
-            $('confirm-message').textContent = message;
+  function showConfirm(title, message) {
+    return new Promise((resolve) => {
+      $("confirm-title").textContent = title;
+      $("confirm-message").textContent = message;
 
-            const yesBtn = $('btn-confirm-yes');
-            const noBtn = $('btn-confirm-no');
+      const yesBtn = $("btn-confirm-yes");
+      const noBtn = $("btn-confirm-no");
 
-            function cleanup() {
-                yesBtn.removeEventListener('click', onYes);
-                noBtn.removeEventListener('click', onNo);
-                modalConfirm.removeEventListener('close', onClose);
-                modalConfirm.close();
-            }
+      // Clonar só os botões para limpar listeners antigos
+      const newYesBtn = yesBtn.cloneNode(true);
+      const newNoBtn = noBtn.cloneNode(true);
+      yesBtn.replaceWith(newYesBtn);
+      noBtn.replaceWith(newNoBtn);
 
-            function onYes() { cleanup(); resolve(true); }
-            function onNo() { cleanup(); resolve(false); }
-            function onClose() { cleanup(); resolve(false); }
+      let resolved = false;
 
-            yesBtn.addEventListener('click', onYes);
-            noBtn.addEventListener('click', onNo);
-            modalConfirm.addEventListener('close', onClose);
-
-            modalConfirm.showModal();
-        });
-    }
-
-    // =============================================
-    // PERSISTÊNCIA (localStorage)
-    // =============================================
-
-    function saveState() {
-        try {
-            const state = {
-                players, config, roundHistory, currentRound, nextId, gameStarted,
-                originalOrder, dealerIndex, undoSnapshot,
-            };
-            localStorage.setItem('pontinho-state', JSON.stringify(state));
-        } catch (e) {
-            // Silently fail if storage is full
+      function onYes() {
+        if (!resolved) {
+          resolved = true;
+          modalConfirm.close();
+          resolve(true);
         }
-    }
+      }
 
-    function loadState() {
-        try {
-            const saved = localStorage.getItem('pontinho-state');
-            if (!saved) return false;
-            const state = JSON.parse(saved);
-            players = state.players || [];
-            config = state.config || { entry: 0, rebuy: 0 };
-            roundHistory = state.roundHistory || [];
-            currentRound = state.currentRound || 0;
-            nextId = state.nextId || 1;
-            gameStarted = state.gameStarted || false;
-            originalOrder = state.originalOrder || [];
-            dealerIndex = state.dealerIndex || 0;
-            undoSnapshot = state.undoSnapshot || null;
-
-            // Migração: adiciona campos novos a jogadores antigos
-            players.forEach(p => {
-                if (p.roundsWon === undefined) p.roundsWon = 0;
-                if (p.biggestLoss === undefined) p.biggestLoss = 0;
-            });
-
-            return gameStarted;
-        } catch (e) {
-            return false;
+      function onNo() {
+        if (!resolved) {
+          resolved = true;
+          modalConfirm.close();
+          resolve(false);
         }
-    }
+      }
 
-    function clearState() {
-        localStorage.removeItem('pontinho-state');
-    }
-
-    // =============================================
-    // SISTEMA UNDO (Ponto de Restauração)
-    // =============================================
-
-    /** Salva um snapshot do estado atual antes de cada processamento */
-    function takeSnapshot() {
-        undoSnapshot = {
-            players: JSON.parse(JSON.stringify(players)),
-            roundHistory: JSON.parse(JSON.stringify(roundHistory)),
-            currentRound,
-            dealerIndex,
-            originalOrder: [...originalOrder],
-        };
-    }
-
-    /** Restaura o último snapshot salvo */
-    function undo() {
-        if (!undoSnapshot) {
-            showToast('Nada para desfazer!', 'warning');
-            return;
+      function onClose() {
+        if (!resolved) {
+          resolved = true;
+          resolve(false);
         }
-        players = undoSnapshot.players;
-        roundHistory = undoSnapshot.roundHistory;
-        currentRound = undoSnapshot.currentRound;
-        dealerIndex = undoSnapshot.dealerIndex;
-        originalOrder = undoSnapshot.originalOrder;
-        undoSnapshot = null;
-        saveState();
-        renderGame();
-        showToast('Ação desfeita!', 'info');
+      }
+
+      newYesBtn.addEventListener("click", onYes);
+      newNoBtn.addEventListener("click", onNo);
+      // Use 'once' para não acumular listeners do close
+      modalConfirm.addEventListener("close", onClose, { once: true });
+
+      modalConfirm.showModal();
+    });
+  }
+
+  // =============================================
+  // PERSISTÊNCIA (localStorage)
+  // =============================================
+
+  function saveState() {
+    try {
+      const state = {
+        players,
+        config,
+        roundHistory,
+        currentRound,
+        nextId,
+        gameStarted,
+        originalOrder,
+        dealerIndex,
+        undoSnapshot,
+      };
+      localStorage.setItem("pontinho-state", JSON.stringify(state));
+    } catch (e) {
+      // Silently fail if storage is full
+    }
+  }
+
+  function loadState() {
+    try {
+      const saved = localStorage.getItem("pontinho-state");
+      if (!saved) return false;
+      const state = JSON.parse(saved);
+      players = state.players || [];
+      config = state.config || { entry: 0, rebuy: 0 };
+      roundHistory = state.roundHistory || [];
+      currentRound = state.currentRound || 0;
+      nextId = state.nextId || 1;
+      gameStarted = state.gameStarted || false;
+      originalOrder = state.originalOrder || [];
+      dealerIndex = state.dealerIndex || 0;
+      undoSnapshot = state.undoSnapshot || null;
+
+      // Migração: adiciona campos novos a jogadores antigos
+      players.forEach((p) => {
+        if (p.roundsWon === undefined) p.roundsWon = 0;
+        if (p.biggestLoss === undefined) p.biggestLoss = 0;
+      });
+
+      return gameStarted;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function clearState() {
+    localStorage.removeItem("pontinho-state");
+  }
+
+  // =============================================
+  // SISTEMA UNDO (Ponto de Restauração)
+  // =============================================
+
+  /** Salva um snapshot do estado atual antes de cada processamento */
+  function takeSnapshot() {
+    undoSnapshot = {
+      players: JSON.parse(JSON.stringify(players)),
+      roundHistory: JSON.parse(JSON.stringify(roundHistory)),
+      currentRound,
+      dealerIndex,
+      originalOrder: [...originalOrder],
+    };
+  }
+
+  /** Restaura o último snapshot salvo */
+  function undo() {
+    if (!undoSnapshot) {
+      showToast("Nada para desfazer!", "warning");
+      return;
+    }
+    players = undoSnapshot.players;
+    roundHistory = undoSnapshot.roundHistory;
+    currentRound = undoSnapshot.currentRound;
+    dealerIndex = undoSnapshot.dealerIndex;
+    originalOrder = undoSnapshot.originalOrder;
+    undoSnapshot = null;
+    saveState();
+    renderGame();
+    showToast("Ação desfeita!", "info");
+  }
+
+  // =============================================
+  // NAVEGAÇÃO
+  // =============================================
+
+  /** Modo amistoso: entra direto sem valores */
+  function startAmistoso() {
+    config.entry = 0;
+    config.rebuy = 0;
+    gameStarted = true;
+
+    setupScreen.classList.add("hidden");
+    gameScreen.classList.remove("hidden");
+    gameScreen.classList.add("flex");
+
+    saveState();
+    renderGame();
+  }
+
+  /** Mostra os campos de valor para o modo apostado */
+  function showApostadoFields() {
+    modeSelection.classList.add("hidden");
+    apostadoFields.classList.remove("hidden");
+    setTimeout(() => entryFeeInput.focus(), 100);
+  }
+
+  /** Modo apostado: valida valores e inicia */
+  function startApostado() {
+    const entryVal = parseFloat(entryFeeInput.value) || 0;
+    const rebuyVal = parseFloat(rebuyFeeInput.value) || 0;
+
+    if (entryVal <= 0 || rebuyVal <= 0) {
+      showToast("Preencha valores maiores que zero!", "error");
+      return;
     }
 
-    // =============================================
-    // NAVEGAÇÃO
-    // =============================================
+    config.entry = entryVal;
+    config.rebuy = rebuyVal;
+    gameStarted = true;
 
-    /** Modo amistoso: entra direto sem valores */
-    function startAmistoso() {
-        config.entry = 0;
-        config.rebuy = 0;
-        gameStarted = true;
+    setupScreen.classList.add("hidden");
+    gameScreen.classList.remove("hidden");
+    gameScreen.classList.add("flex");
 
-        setupScreen.classList.add('hidden');
-        gameScreen.classList.remove('hidden');
-        gameScreen.classList.add('flex');
+    saveState();
+    renderGame();
+  }
 
-        saveState();
-        renderGame();
+  function restoreGame() {
+    setupScreen.classList.add("hidden");
+    gameScreen.classList.remove("hidden");
+    gameScreen.classList.add("flex");
+    renderGame();
+  }
+
+  async function newGame() {
+    const confirmed = await showConfirm(
+      "Nova Mesa",
+      "Tem certeza que deseja encerrar o jogo atual e começar uma nova mesa?",
+    );
+    if (!confirmed) return;
+
+    players = [];
+    config = { entry: 0, rebuy: 0 };
+    roundHistory = [];
+    currentRound = 0;
+    nextId = 1;
+    gameStarted = false;
+    originalOrder = [];
+    dealerIndex = 0;
+    undoSnapshot = null;
+    confettiShown = false;
+
+    clearState();
+
+    gameScreen.classList.add("hidden");
+    gameScreen.classList.remove("flex");
+    setupScreen.classList.remove("hidden");
+
+    entryFeeInput.value = "";
+    rebuyFeeInput.value = "";
+    modeSelection.classList.remove("hidden");
+    apostadoFields.classList.add("hidden");
+    winnerBanner.classList.add("hidden");
+    roundCounterEl.textContent = "";
+
+    showToast("Mesa encerrada!", "info");
+  }
+
+  // =============================================
+  // LÓGICA CORE
+  // =============================================
+
+  /** Busca a menor pontuação positiva (> 0) da mesa. Fallback para >= 0, depois 99. */
+  function getLowestPositiveScore() {
+    const positivePlayers = players.filter((p) => !p.eliminated && p.score > 0);
+    if (positivePlayers.length > 0) {
+      return Math.min(...positivePlayers.map((p) => p.score));
+    }
+    const activePlayers = players.filter((p) => !p.eliminated && p.score >= 0);
+    if (activePlayers.length > 0) {
+      return Math.min(...activePlayers.map((p) => p.score));
+    }
+    return 99;
+  }
+
+  function confirmAddPlayer() {
+    const name = newPlayerNameInput.value.trim().toUpperCase();
+    if (!name) {
+      showToast("Digite o nome do jogador!", "warning");
+      return;
+    }
+    if (name.length > 20) {
+      showToast("Nome muito longo! Máximo 20 caracteres.", "warning");
+      return;
+    }
+    if (players.some((p) => p.name === name && !p.eliminated)) {
+      showToast("Já existe um jogador ativo com esse nome!", "warning");
+      return;
     }
 
-    /** Mostra os campos de valor para o modo apostado */
-    function showApostadoFields() {
-        modeSelection.classList.add('hidden');
-        apostadoFields.classList.remove('hidden');
-        setTimeout(() => entryFeeInput.focus(), 100);
+    takeSnapshot();
+
+    // Entrada tardia: se já houve rodada, recebe a menor pontuação positiva
+    const isLateEntry = currentRound > 0;
+    const startScore = isLateEntry ? getLowestPositiveScore() : 99;
+
+    const newPlayer = {
+      id: nextId++,
+      name: name,
+      score: startScore,
+      debt: config.entry,
+      hasPaid: false,
+      eliminated: false,
+      roundsWon: 0,
+      biggestLoss: 0,
+    };
+
+    players.push(newPlayer);
+    originalOrder.push(newPlayer.id);
+
+    newPlayerNameInput.value = "";
+    modalAddPlayer.close();
+    saveState();
+    renderGame();
+
+    if (isLateEntry) {
+      showToast(`${name} entrou com ${startScore} pontos!`, "success");
+    } else {
+      showToast(`${name} entrou na mesa!`, "success");
     }
+  }
 
-    /** Modo apostado: valida valores e inicia */
-    function startApostado() {
-        const entryVal = parseFloat(entryFeeInput.value) || 0;
-        const rebuyVal = parseFloat(rebuyFeeInput.value) || 0;
-
-        if (entryVal <= 0 || rebuyVal <= 0) {
-            showToast('Preencha valores maiores que zero!', 'error');
-            return;
-        }
-
-        config.entry = entryVal;
-        config.rebuy = rebuyVal;
-        gameStarted = true;
-
-        setupScreen.classList.add('hidden');
-        gameScreen.classList.remove('hidden');
-        gameScreen.classList.add('flex');
-
-        saveState();
-        renderGame();
+  function togglePayment(id) {
+    const player = players.find((p) => p.id === id);
+    if (player && player.debt > 0) {
+      player.hasPaid = !player.hasPaid;
+      saveState();
+      renderGame();
+      showToast(
+        player.hasPaid
+          ? `${player.name} pagou!`
+          : `Pagamento de ${player.name} desmarcado.`,
+        player.hasPaid ? "success" : "info",
+      );
     }
+  }
 
-    function restoreGame() {
-        setupScreen.classList.add('hidden');
-        gameScreen.classList.remove('hidden');
-        gameScreen.classList.add('flex');
-        renderGame();
-    }
+  // =============================================
+  // HELPERS UX
+  // =============================================
 
-    async function newGame() {
-        const confirmed = await showConfirm(
-            'Nova Mesa',
-            'Tem certeza que deseja encerrar o jogo atual e começar uma nova mesa?'
-        );
-        if (!confirmed) return;
+  /** Retorna classes Tailwind para o círculo de score baseado na faixa */
+  function getScoreZoneColor(score) {
+    if (score >= 50) return "bg-green-100 text-green-800";
+    if (score >= 20) return "bg-yellow-100 text-yellow-800";
+    if (score >= 1) return "bg-orange-100 text-orange-800";
+    return "bg-gray-200 text-gray-600";
+  }
 
-        players = [];
-        config = { entry: 0, rebuy: 0 };
-        roundHistory = [];
-        currentRound = 0;
-        nextId = 1;
-        gameStarted = false;
-        originalOrder = [];
-        dealerIndex = 0;
-        undoSnapshot = null;
-        confettiShown = false;
+  /** Retorna os pontos perdidos por um jogador na última rodada, ou null */
+  function getLastRoundLoss(playerId) {
+    if (roundHistory.length === 0) return null;
+    const last = roundHistory[roundHistory.length - 1];
+    return last.scores[playerId] ?? null;
+  }
 
-        clearState();
+  /** Efeito de confetti para celebrar o vencedor */
+  function triggerConfetti() {
+    const container = document.createElement("div");
+    container.style.cssText =
+      "position:fixed;inset:0;pointer-events:none;z-index:200;overflow:hidden;";
 
-        gameScreen.classList.add('hidden');
-        gameScreen.classList.remove('flex');
-        setupScreen.classList.remove('hidden');
-
-        entryFeeInput.value = '';
-        rebuyFeeInput.value = '';
-        modeSelection.classList.remove('hidden');
-        apostadoFields.classList.add('hidden');
-        winnerBanner.classList.add('hidden');
-        roundCounterEl.textContent = '';
-
-        showToast('Mesa encerrada!', 'info');
-    }
-
-    // =============================================
-    // LÓGICA CORE
-    // =============================================
-
-    /** Busca a menor pontuação positiva (> 0) da mesa. Fallback para >= 0, depois 99. */
-    function getLowestPositiveScore() {
-        const positivePlayers = players.filter(p => !p.eliminated && p.score > 0);
-        if (positivePlayers.length > 0) {
-            return Math.min(...positivePlayers.map(p => p.score));
-        }
-        const activePlayers = players.filter(p => !p.eliminated && p.score >= 0);
-        if (activePlayers.length > 0) {
-            return Math.min(...activePlayers.map(p => p.score));
-        }
-        return 99;
-    }
-
-    function confirmAddPlayer() {
-        const name = newPlayerNameInput.value.trim().toUpperCase();
-        if (!name) {
-            showToast('Digite o nome do jogador!', 'warning');
-            return;
-        }
-        if (name.length > 20) {
-            showToast('Nome muito longo! Máximo 20 caracteres.', 'warning');
-            return;
-        }
-        if (players.some(p => p.name === name && !p.eliminated)) {
-            showToast('Já existe um jogador ativo com esse nome!', 'warning');
-            return;
-        }
-
-        takeSnapshot();
-
-        // Entrada tardia: se já houve rodada, recebe a menor pontuação positiva
-        const isLateEntry = currentRound > 0;
-        const startScore = isLateEntry ? getLowestPositiveScore() : 99;
-
-        const newPlayer = {
-            id: nextId++,
-            name: name,
-            score: startScore,
-            debt: config.entry,
-            hasPaid: false,
-            eliminated: false,
-            roundsWon: 0,
-            biggestLoss: 0,
-        };
-
-        players.push(newPlayer);
-        originalOrder.push(newPlayer.id);
-
-        newPlayerNameInput.value = '';
-        modalAddPlayer.close();
-        saveState();
-        renderGame();
-
-        if (isLateEntry) {
-            showToast(`${name} entrou com ${startScore} pontos!`, 'success');
-        } else {
-            showToast(`${name} entrou na mesa!`, 'success');
-        }
-    }
-
-    function togglePayment(id) {
-        const player = players.find(p => p.id === id);
-        if (player && player.debt > 0) {
-            player.hasPaid = !player.hasPaid;
-            saveState();
-            renderGame();
-            showToast(
-                player.hasPaid ? `${player.name} pagou!` : `Pagamento de ${player.name} desmarcado.`,
-                player.hasPaid ? 'success' : 'info'
-            );
-        }
-    }
-
-    // =============================================
-    // HELPERS UX
-    // =============================================
-
-    /** Retorna classes Tailwind para o círculo de score baseado na faixa */
-    function getScoreZoneColor(score) {
-        if (score >= 50) return 'bg-green-100 text-green-800';
-        if (score >= 20) return 'bg-yellow-100 text-yellow-800';
-        if (score >= 1) return 'bg-orange-100 text-orange-800';
-        return 'bg-gray-200 text-gray-600';
-    }
-
-    /** Retorna os pontos perdidos por um jogador na última rodada, ou null */
-    function getLastRoundLoss(playerId) {
-        if (roundHistory.length === 0) return null;
-        const last = roundHistory[roundHistory.length - 1];
-        return last.scores[playerId] ?? null;
-    }
-
-    /** Efeito de confetti para celebrar o vencedor */
-    function triggerConfetti() {
-        const container = document.createElement('div');
-        container.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:200;overflow:hidden;';
-
-        const colors = ['#f59e0b', '#10b981', '#3b82f6', '#ef4444', '#8b5cf6', '#ec4899'];
-        for (let i = 0; i < 60; i++) {
-            const piece = document.createElement('div');
-            const size = Math.random() * 8 + 4;
-            piece.style.cssText = `
+    const colors = [
+      "#f59e0b",
+      "#10b981",
+      "#3b82f6",
+      "#ef4444",
+      "#8b5cf6",
+      "#ec4899",
+    ];
+    for (let i = 0; i < 60; i++) {
+      const piece = document.createElement("div");
+      const size = Math.random() * 8 + 4;
+      piece.style.cssText = `
                 position:absolute;
                 width:${size}px;height:${size}px;
                 background:${colors[Math.floor(Math.random() * colors.length)]};
                 left:${Math.random() * 100}%;top:-10px;
-                border-radius:${Math.random() > 0.5 ? '50%' : '2px'};
+                border-radius:${Math.random() > 0.5 ? "50%" : "2px"};
                 animation:confettiFall ${Math.random() * 2 + 2}s linear forwards;
                 animation-delay:${Math.random() * 0.8}s;
             `;
-            container.appendChild(piece);
-        }
-        document.body.appendChild(container);
-        setTimeout(() => container.remove(), 5000);
+      container.appendChild(piece);
     }
+    document.body.appendChild(container);
+    setTimeout(() => container.remove(), 5000);
+  }
 
-    // =============================================
-    // DEALER (Distribuidor)
-    // =============================================
+  // =============================================
+  // DEALER (Distribuidor)
+  // =============================================
 
-    /** Retorna o ID do jogador que é o dealer atual */
-    function getCurrentDealerId() {
-        if (originalOrder.length === 0) return null;
-        if (dealerIndex >= originalOrder.length) dealerIndex = 0;
-        return originalOrder[dealerIndex];
-    }
+  /** Retorna o ID do jogador que é o dealer atual */
+  function getCurrentDealerId() {
+    if (originalOrder.length === 0) return null;
+    if (dealerIndex >= originalOrder.length) dealerIndex = 0;
+    return originalOrder[dealerIndex];
+  }
 
-    /** Avança o dealer para o próximo jogador ativo na ordem original */
-    function advanceDealer() {
-        if (originalOrder.length === 0) return;
+  /** Avança o dealer para o próximo jogador ativo na ordem original */
+  function advanceDealer() {
+    if (originalOrder.length === 0) return;
 
-        let attempts = 0;
-        do {
-            dealerIndex = (dealerIndex + 1) % originalOrder.length;
-            attempts++;
-            const playerId = originalOrder[dealerIndex];
-            const player = players.find(p => p.id === playerId);
-            if (player && !player.eliminated) return;
-        } while (attempts < originalOrder.length);
-    }
+    let attempts = 0;
+    do {
+      dealerIndex = (dealerIndex + 1) % originalOrder.length;
+      attempts++;
+      const playerId = originalOrder[dealerIndex];
+      const player = players.find((p) => p.id === playerId);
+      if (player && !player.eliminated) return;
+    } while (attempts < originalOrder.length);
+  }
 
-    // =============================================
-    // RODADA
-    // =============================================
+  // =============================================
+  // RODADA
+  // =============================================
 
-    function openEndRoundModal() {
-        const container = roundInputsEl;
-        container.innerHTML = '';
+  function openEndRoundModal() {
+    const container = roundInputsEl;
+    container.innerHTML = "";
 
-        const activePlayers = players.filter(p => !p.eliminated);
-        const dealerId = getCurrentDealerId();
+    const activePlayers = players.filter((p) => !p.eliminated);
+    const dealerId = getCurrentDealerId();
 
-        let html = '';
-        activePlayers.forEach(p => {
-            const safeName = escapeHtml(p.name);
-            const isDealer = p.id === dealerId && currentRound > 0;
-            const zoneColor = p.score >= 50 ? 'text-green-600' : p.score >= 20 ? 'text-yellow-600' : 'text-orange-600';
-            html += `
+    let html = "";
+    activePlayers.forEach((p) => {
+      const safeName = escapeHtml(p.name);
+      const isDealer = p.id === dealerId && currentRound > 0;
+      const zoneColor =
+        p.score >= 50
+          ? "text-green-600"
+          : p.score >= 20
+            ? "text-yellow-600"
+            : "text-orange-600";
+      html += `
                 <div class="flex items-center gap-2 bg-gray-50 p-3 rounded-xl">
                     <div class="min-w-0 flex-1">
-                        <div class="font-bold text-gray-700 text-sm truncate">${isDealer ? '🃏 ' : ''}${safeName}</div>
+                        <div class="font-bold text-gray-700 text-sm truncate">${isDealer ? "🃏 " : ""}${safeName}</div>
                         <div class="text-xs ${zoneColor} font-medium">Atual: ${p.score}</div>
                     </div>
                     <input type="number" data-player-id="${p.id}" data-current-score="${p.score}" min="0"
@@ -450,564 +493,599 @@ const App = (() => {
                     </div>
                 </div>
             `;
-        });
-        container.innerHTML = html;
-        modalEndRound.showModal();
+    });
+    container.innerHTML = html;
+    modalEndRound.showModal();
 
-        // Live preview + Enter navigation
-        const inputs = [...container.querySelectorAll('input')];
-        inputs.forEach((input, i) => {
-            // Preview em tempo real
-            input.addEventListener('input', () => {
-                const lost = parseInt(input.value) || 0;
-                const current = parseInt(input.dataset.currentScore);
-                const newScore = current - lost;
-                const previewEl = container.querySelector(`[data-preview-for="${input.dataset.playerId}"]`);
-                if (previewEl) {
-                    previewEl.textContent = newScore;
-                    if (newScore < 0) {
-                        previewEl.className = 'font-bold text-sm text-red-500 bust-preview';
-                        previewEl.textContent = newScore + ' 💥';
-                    } else if (newScore <= 10) {
-                        previewEl.className = 'font-bold text-sm text-orange-500';
-                    } else {
-                        previewEl.className = 'font-bold text-sm text-green-600';
-                    }
-                }
-            });
+    // Live preview + Enter navigation
+    const inputs = [...container.querySelectorAll("input")];
+    inputs.forEach((input, i) => {
+      // Preview em tempo real
+      input.addEventListener("input", () => {
+        const lost = parseInt(input.value) || 0;
+        const current = parseInt(input.dataset.currentScore);
+        const newScore = current - lost;
+        const previewEl = container.querySelector(
+          `[data-preview-for="${input.dataset.playerId}"]`,
+        );
+        if (previewEl) {
+          previewEl.textContent = newScore;
+          if (newScore < 0) {
+            previewEl.className = "font-bold text-sm text-red-500 bust-preview";
+            previewEl.textContent = newScore + " 💥";
+          } else if (newScore <= 10) {
+            previewEl.className = "font-bold text-sm text-orange-500";
+          } else {
+            previewEl.className = "font-bold text-sm text-green-600";
+          }
+        }
+      });
 
-            // Enter → próximo input ou processar
-            input.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    if (i < inputs.length - 1) {
-                        inputs[i + 1].focus();
-                        inputs[i + 1].select();
-                    } else {
-                        processRound();
-                    }
-                }
-            });
-        });
+      // Enter → próximo input ou processar
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          if (i < inputs.length - 1) {
+            inputs[i + 1].focus();
+            inputs[i + 1].select();
+          } else {
+            processRound();
+          }
+        }
+      });
+    });
 
-        if (inputs[0]) inputs[0].focus();
+    if (inputs[0]) inputs[0].focus();
+  }
+
+  async function processRound() {
+    // Validação: impedir valores negativos
+    const inputs = document.querySelectorAll("#round-inputs [data-player-id]");
+    for (const input of inputs) {
+      const val = parseInt(input.value) || 0;
+      if (val < 0) {
+        showToast("Valores não podem ser negativos!", "error");
+        return;
+      }
     }
 
-    async function processRound() {
-        // Validação: impedir valores negativos
-        const inputs = document.querySelectorAll('#round-inputs [data-player-id]');
-        for (const input of inputs) {
-            const val = parseInt(input.value) || 0;
-            if (val < 0) {
-                showToast('Valores não podem ser negativos!', 'error');
-                return;
-            }
-        }
+    // Aviso: todos os inputs são 0
+    const allZero = [...inputs].every(
+      (input) => (parseInt(input.value) || 0) === 0,
+    );
+    if (allZero) {
+      const proceed = await showConfirm(
+        "Tudo zero?",
+        "Todos os valores estão zerados. Tem certeza que deseja processar esta rodada?",
+      );
+      if (!proceed) return;
+    }
 
-        // Aviso: todos os inputs são 0
-        const allZero = [...inputs].every(input => (parseInt(input.value) || 0) === 0);
-        if (allZero) {
-            const proceed = await showConfirm(
-                'Tudo zero?',
-                'Todos os valores estão zerados. Tem certeza que deseja processar esta rodada?'
+    takeSnapshot();
+
+    // Travar originalOrder na primeira rodada (se ainda vazio)
+    if (originalOrder.length === 0) {
+      originalOrder = players.filter((p) => !p.eliminated).map((p) => p.id);
+    }
+
+    const roundData = {};
+
+    players.forEach((p) => {
+      if (!p.eliminated) {
+        const input = document.querySelector(
+          `#round-inputs [data-player-id="${p.id}"]`,
+        );
+        if (input) {
+          const lost = parseInt(input.value) || 0;
+          roundData[p.id] = lost;
+          p.score -= lost;
+
+          // Métricas automáticas
+          if (lost === 0) {
+            p.roundsWon++;
+          }
+          if (lost > p.biggestLoss) {
+            p.biggestLoss = lost;
+          }
+        }
+      }
+    });
+
+    currentRound++;
+    roundHistory.push({
+      round: currentRound,
+      scores: { ...roundData },
+      playerNames: Object.fromEntries(players.map((p) => [p.id, p.name])),
+    });
+
+    // Avançar dealer (pula a primeira rodada pois dealer começa na posição 0)
+    if (currentRound > 1) {
+      advanceDealer();
+    }
+
+    modalEndRound.close();
+    saveState();
+    await checkEstouros();
+  }
+
+  // =============================================
+  // ESTOURO E REBUY
+  // =============================================
+
+  async function checkEstouros() {
+    for (const player of players) {
+      if (!player.eliminated && player.score < 0) {
+        // Feedback tátil no mobile
+        navigator.vibrate?.(200);
+
+        const survivors = players.filter(
+          (p) => p.score >= 0 && !p.eliminated,
+        ).length;
+
+        // Reentrada só é permitida se houver >= 2 sobreviventes
+        if (survivors >= 2) {
+          const rebuyMsg = isAmistoso()
+            ? `Pontuação: ${player.score}. Deseja voltar ao jogo?`
+            : `Pontuação: ${player.score}. Deseja pagar a volta (R$ ${config.rebuy.toFixed(2)})?`;
+
+          const confirmed = await showConfirm(
+            `${player.name} ESTOUROU!`,
+            rebuyMsg,
+          );
+
+          if (confirmed) {
+            takeSnapshot();
+            const targetScore = getLowestPositiveScore();
+            player.score = targetScore;
+            player.debt += config.rebuy;
+            player.hasPaid = false;
+            showToast(
+              `${player.name} voltou com ${targetScore} pontos!`,
+              "info",
             );
-            if (!proceed) return;
+          } else {
+            takeSnapshot();
+            player.eliminated = true;
+            showToast(`${player.name} foi eliminado!`, "error");
+          }
+        } else {
+          // Reentrada proibida: <= 1 sobrevivente
+          player.eliminated = true;
+          showToast(
+            `${player.name} foi eliminado! Reentrada proibida.`,
+            "error",
+          );
         }
+      }
+    }
+    saveState();
+    renderGame();
+  }
 
-        takeSnapshot();
+  // =============================================
+  // DRAG AND DROP (Ordem da Mesa - Rodada 1)
+  // =============================================
 
-        // Travar originalOrder na primeira rodada (se ainda vazio)
-        if (originalOrder.length === 0) {
-            originalOrder = players.filter(p => !p.eliminated).map(p => p.id);
+  function setupDragAndDrop() {
+    let dragSrcId = null;
+
+    // --- Desktop: HTML5 Drag and Drop ---
+    playersListEl.addEventListener("dragstart", (e) => {
+      if (currentRound > 0) return;
+      const card = e.target.closest('.player-card[draggable="true"]');
+      if (!card) return;
+      dragSrcId = parseInt(card.dataset.playerId);
+      card.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", String(dragSrcId));
+    });
+
+    playersListEl.addEventListener("dragover", (e) => {
+      if (currentRound > 0) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      const card = e.target.closest(".player-card");
+      if (card && parseInt(card.dataset.playerId) !== dragSrcId) {
+        card.classList.add("ring-2", "ring-yellow-400");
+      }
+    });
+
+    playersListEl.addEventListener("dragleave", (e) => {
+      const card = e.target.closest(".player-card");
+      if (card) {
+        card.classList.remove("ring-2", "ring-yellow-400");
+      }
+    });
+
+    playersListEl.addEventListener("drop", (e) => {
+      if (currentRound > 0) return;
+      e.preventDefault();
+      const card = e.target.closest(".player-card");
+      if (!card) return;
+      card.classList.remove("ring-2", "ring-yellow-400");
+
+      const targetId = parseInt(card.dataset.playerId);
+      if (dragSrcId === targetId) return;
+
+      reorderPlayer(dragSrcId, targetId);
+    });
+
+    playersListEl.addEventListener("dragend", (e) => {
+      playersListEl.querySelectorAll(".player-card").forEach((c) => {
+        c.classList.remove("dragging", "ring-2", "ring-yellow-400");
+      });
+      dragSrcId = null;
+    });
+
+    // --- Mobile: Touch Drag and Drop ---
+    let touchSrcId = null;
+    let touchClone = null;
+    let touchOffsetY = 0;
+
+    playersListEl.addEventListener(
+      "touchstart",
+      (e) => {
+        if (currentRound > 0) return;
+        const handle = e.target.closest(".drag-handle");
+        if (!handle) return;
+
+        const card = handle.closest(".player-card");
+        if (!card) return;
+
+        touchSrcId = parseInt(card.dataset.playerId);
+        const touch = e.touches[0];
+        const rect = card.getBoundingClientRect();
+        touchOffsetY = touch.clientY - rect.top;
+
+        touchClone = card.cloneNode(true);
+        touchClone.style.position = "fixed";
+        touchClone.style.left = rect.left + "px";
+        touchClone.style.top = rect.top + "px";
+        touchClone.style.width = rect.width + "px";
+        touchClone.style.zIndex = "1000";
+        touchClone.style.opacity = "0.85";
+        touchClone.style.boxShadow = "0 8px 25px rgba(0,0,0,0.3)";
+        touchClone.style.pointerEvents = "none";
+        touchClone.style.transition = "none";
+        document.body.appendChild(touchClone);
+
+        card.classList.add("dragging");
+        e.preventDefault();
+      },
+      { passive: false },
+    );
+
+    playersListEl.addEventListener(
+      "touchmove",
+      (e) => {
+        if (!touchClone || touchSrcId === null) return;
+
+        const touch = e.touches[0];
+        touchClone.style.top = touch.clientY - touchOffsetY + "px";
+
+        // Highlight card under finger
+        const cards = [...playersListEl.querySelectorAll(".player-card")];
+        cards.forEach((c) => c.classList.remove("ring-2", "ring-yellow-400"));
+        const cardUnder = cards.find((c) => {
+          if (parseInt(c.dataset.playerId) === touchSrcId) return false;
+          const rect = c.getBoundingClientRect();
+          return touch.clientY > rect.top && touch.clientY < rect.bottom;
+        });
+        if (cardUnder) {
+          cardUnder.classList.add("ring-2", "ring-yellow-400");
         }
+        e.preventDefault();
+      },
+      { passive: false },
+    );
 
-        const roundData = {};
+    playersListEl.addEventListener("touchend", () => {
+      if (touchSrcId === null) return;
 
-        players.forEach(p => {
-            if (!p.eliminated) {
-                const input = document.querySelector(`#round-inputs [data-player-id="${p.id}"]`);
-                if (input) {
-                    const lost = parseInt(input.value) || 0;
-                    roundData[p.id] = lost;
-                    p.score -= lost;
+      const highlighted = playersListEl.querySelector(
+        ".player-card.ring-yellow-400",
+      );
+      if (highlighted) {
+        const targetId = parseInt(highlighted.dataset.playerId);
+        reorderPlayer(touchSrcId, targetId);
+      }
 
-                    // Métricas automáticas
-                    if (lost === 0) {
-                        p.roundsWon++;
-                    }
-                    if (lost > p.biggestLoss) {
-                        p.biggestLoss = lost;
-                    }
-                }
-            }
-        });
+      // Cleanup
+      playersListEl.querySelectorAll(".player-card").forEach((c) => {
+        c.classList.remove("dragging", "ring-2", "ring-yellow-400");
+      });
 
-        currentRound++;
-        roundHistory.push({
-            round: currentRound,
-            scores: { ...roundData },
-            playerNames: Object.fromEntries(players.map(p => [p.id, p.name])),
-        });
+      if (touchClone) {
+        touchClone.remove();
+        touchClone = null;
+      }
 
-        // Avançar dealer (pula a primeira rodada pois dealer começa na posição 0)
-        if (currentRound > 1) {
-            advanceDealer();
-        }
+      touchSrcId = null;
+      renderGame();
+    });
+  }
 
-        modalEndRound.close();
-        saveState();
-        checkEstouros();
-    }
+  /** Move um jogador da posição de srcId para a posição de targetId */
+  function reorderPlayer(srcId, targetId) {
+    const srcIndex = players.findIndex((p) => p.id === srcId);
+    const targetIndex = players.findIndex((p) => p.id === targetId);
+    if (srcIndex === -1 || targetIndex === -1) return;
 
-    // =============================================
-    // ESTOURO E REBUY
-    // =============================================
+    const [moved] = players.splice(srcIndex, 1);
+    players.splice(targetIndex, 0, moved);
 
-    async function checkEstouros() {
-        for (const player of players) {
-            if (!player.eliminated && player.score < 0) {
-                // Feedback tátil no mobile
-                navigator.vibrate?.(200);
+    originalOrder = players.map((p) => p.id);
+    saveState();
+    renderGame();
+  }
 
-                const survivors = players.filter(p => p.score >= 0 && !p.eliminated).length;
+  // =============================================
+  // HISTÓRICO
+  // =============================================
 
-                // Reentrada só é permitida se houver >= 2 sobreviventes
-                if (survivors >= 2) {
-                    const rebuyMsg = isAmistoso()
-                        ? `Pontuação: ${player.score}. Deseja voltar ao jogo?`
-                        : `Pontuação: ${player.score}. Deseja pagar a volta (R$ ${config.rebuy.toFixed(2)})?`;
+  function openHistory() {
+    const container = $("history-content");
 
-                    const confirmed = await showConfirm(
-                        `${player.name} ESTOUROU!`,
-                        rebuyMsg
-                    );
-
-                    if (confirmed) {
-                        takeSnapshot();
-                        const targetScore = getLowestPositiveScore();
-                        player.score = targetScore;
-                        player.debt += config.rebuy;
-                        player.hasPaid = false;
-                        showToast(`${player.name} voltou com ${targetScore} pontos!`, 'info');
-                    } else {
-                        takeSnapshot();
-                        player.eliminated = true;
-                        showToast(`${player.name} foi eliminado!`, 'error');
-                    }
-                } else {
-                    // Reentrada proibida: <= 1 sobrevivente
-                    player.eliminated = true;
-                    showToast(`${player.name} foi eliminado! Reentrada proibida.`, 'error');
-                }
-            }
-        }
-        saveState();
-        renderGame();
-    }
-
-    // =============================================
-    // DRAG AND DROP (Ordem da Mesa - Rodada 1)
-    // =============================================
-
-    function setupDragAndDrop() {
-        let dragSrcId = null;
-
-        // --- Desktop: HTML5 Drag and Drop ---
-        playersListEl.addEventListener('dragstart', (e) => {
-            if (currentRound > 0) return;
-            const card = e.target.closest('.player-card[draggable="true"]');
-            if (!card) return;
-            dragSrcId = parseInt(card.dataset.playerId);
-            card.classList.add('dragging');
-            e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData('text/plain', String(dragSrcId));
-        });
-
-        playersListEl.addEventListener('dragover', (e) => {
-            if (currentRound > 0) return;
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
-            const card = e.target.closest('.player-card');
-            if (card && parseInt(card.dataset.playerId) !== dragSrcId) {
-                card.classList.add('ring-2', 'ring-yellow-400');
-            }
-        });
-
-        playersListEl.addEventListener('dragleave', (e) => {
-            const card = e.target.closest('.player-card');
-            if (card) {
-                card.classList.remove('ring-2', 'ring-yellow-400');
-            }
-        });
-
-        playersListEl.addEventListener('drop', (e) => {
-            if (currentRound > 0) return;
-            e.preventDefault();
-            const card = e.target.closest('.player-card');
-            if (!card) return;
-            card.classList.remove('ring-2', 'ring-yellow-400');
-
-            const targetId = parseInt(card.dataset.playerId);
-            if (dragSrcId === targetId) return;
-
-            reorderPlayer(dragSrcId, targetId);
-        });
-
-        playersListEl.addEventListener('dragend', (e) => {
-            playersListEl.querySelectorAll('.player-card').forEach(c => {
-                c.classList.remove('dragging', 'ring-2', 'ring-yellow-400');
-            });
-            dragSrcId = null;
-        });
-
-        // --- Mobile: Touch Drag and Drop ---
-        let touchSrcId = null;
-        let touchClone = null;
-        let touchOffsetY = 0;
-
-        playersListEl.addEventListener('touchstart', (e) => {
-            if (currentRound > 0) return;
-            const handle = e.target.closest('.drag-handle');
-            if (!handle) return;
-
-            const card = handle.closest('.player-card');
-            if (!card) return;
-
-            touchSrcId = parseInt(card.dataset.playerId);
-            const touch = e.touches[0];
-            const rect = card.getBoundingClientRect();
-            touchOffsetY = touch.clientY - rect.top;
-
-            touchClone = card.cloneNode(true);
-            touchClone.style.position = 'fixed';
-            touchClone.style.left = rect.left + 'px';
-            touchClone.style.top = rect.top + 'px';
-            touchClone.style.width = rect.width + 'px';
-            touchClone.style.zIndex = '1000';
-            touchClone.style.opacity = '0.85';
-            touchClone.style.boxShadow = '0 8px 25px rgba(0,0,0,0.3)';
-            touchClone.style.pointerEvents = 'none';
-            touchClone.style.transition = 'none';
-            document.body.appendChild(touchClone);
-
-            card.classList.add('dragging');
-            e.preventDefault();
-        }, { passive: false });
-
-        playersListEl.addEventListener('touchmove', (e) => {
-            if (!touchClone || touchSrcId === null) return;
-
-            const touch = e.touches[0];
-            touchClone.style.top = (touch.clientY - touchOffsetY) + 'px';
-
-            // Highlight card under finger
-            const cards = [...playersListEl.querySelectorAll('.player-card')];
-            cards.forEach(c => c.classList.remove('ring-2', 'ring-yellow-400'));
-            const cardUnder = cards.find(c => {
-                if (parseInt(c.dataset.playerId) === touchSrcId) return false;
-                const rect = c.getBoundingClientRect();
-                return touch.clientY > rect.top && touch.clientY < rect.bottom;
-            });
-            if (cardUnder) {
-                cardUnder.classList.add('ring-2', 'ring-yellow-400');
-            }
-            e.preventDefault();
-        }, { passive: false });
-
-        playersListEl.addEventListener('touchend', () => {
-            if (touchSrcId === null) return;
-
-            const highlighted = playersListEl.querySelector('.player-card.ring-yellow-400');
-            if (highlighted) {
-                const targetId = parseInt(highlighted.dataset.playerId);
-                reorderPlayer(touchSrcId, targetId);
-            }
-
-            // Cleanup
-            playersListEl.querySelectorAll('.player-card').forEach(c => {
-                c.classList.remove('dragging', 'ring-2', 'ring-yellow-400');
-            });
-
-            if (touchClone) {
-                touchClone.remove();
-                touchClone = null;
-            }
-
-            touchSrcId = null;
-            renderGame();
-        });
-    }
-
-    /** Move um jogador da posição de srcId para a posição de targetId */
-    function reorderPlayer(srcId, targetId) {
-        const srcIndex = players.findIndex(p => p.id === srcId);
-        const targetIndex = players.findIndex(p => p.id === targetId);
-        if (srcIndex === -1 || targetIndex === -1) return;
-
-        const [moved] = players.splice(srcIndex, 1);
-        players.splice(targetIndex, 0, moved);
-
-        originalOrder = players.map(p => p.id);
-        saveState();
-        renderGame();
-    }
-
-    // =============================================
-    // HISTÓRICO
-    // =============================================
-
-    function openHistory() {
-        const container = $('history-content');
-
-        if (roundHistory.length === 0) {
-            container.innerHTML = `
+    if (roundHistory.length === 0) {
+      container.innerHTML = `
                 <div class="text-center text-gray-400 py-8">
                     <i class="fa-solid fa-clock-rotate-left text-4xl mb-3" aria-hidden="true"></i>
                     <p>Nenhuma rodada registrada ainda.</p>
                 </div>
             `;
-        } else {
-            let html = '';
-            [...roundHistory].reverse().forEach(round => {
-                html += `<div class="bg-gray-50 rounded-lg p-3">
+    } else {
+      let html = "";
+      [...roundHistory].reverse().forEach((round) => {
+        html += `<div class="bg-gray-50 rounded-lg p-3">
                     <div class="font-bold text-green-700 text-sm mb-2">Rodada ${round.round}</div>`;
-                Object.entries(round.scores).forEach(([id, lost]) => {
-                    const name = escapeHtml(round.playerNames[id] || 'Desconhecido');
-                    html += `
+        Object.entries(round.scores).forEach(([id, lost]) => {
+          const name = escapeHtml(round.playerNames[id] || "Desconhecido");
+          html += `
                         <div class="flex justify-between gap-2 text-sm py-1 border-b border-gray-100 last:border-0">
                             <span class="text-gray-700 truncate min-w-0">${name}</span>
-                            <span class="font-mono shrink-0 ${lost > 0 ? 'text-red-500' : 'text-green-600 font-bold'}">
-                                ${lost === 0 ? '🏆 0' : '-' + lost}
+                            <span class="font-mono shrink-0 ${lost > 0 ? "text-red-500" : "text-green-600 font-bold"}">
+                                ${lost === 0 ? "🏆 0" : "-" + lost}
                             </span>
                         </div>`;
-                });
-                html += '</div>';
-            });
-            container.innerHTML = html;
-        }
-
-        modalHistory.showModal();
+        });
+        html += "</div>";
+      });
+      container.innerHTML = html;
     }
 
-    // =============================================
-    // RENDERIZAÇÃO (UI)
-    // =============================================
+    modalHistory.showModal();
+  }
 
-    function renderGame() {
-        const amistoso = isAmistoso();
+  // =============================================
+  // RENDERIZAÇÃO (UI)
+  // =============================================
 
-        // --- Pote (oculto no modo amistoso) ---
-        if (amistoso) {
-            potContainer.classList.add('hidden');
-        } else {
-            potContainer.classList.remove('hidden');
-            const totalPot = players.reduce((sum, p) => sum + p.debt, 0);
-            totalPotEl.textContent = totalPot.toFixed(2);
-        }
+  function renderGame() {
+    const amistoso = isAmistoso();
 
-        // --- Mode badge (Amistoso) ---
-        if (amistoso) {
-            modeBadge.classList.remove('hidden');
-        } else {
-            modeBadge.classList.add('hidden');
-        }
+    // --- Pote (oculto no modo amistoso) ---
+    if (amistoso) {
+      potContainer.classList.add("hidden");
+    } else {
+      potContainer.classList.remove("hidden");
+      const totalPot = players.reduce((sum, p) => sum + p.debt, 0);
+      totalPotEl.textContent = totalPot.toFixed(2);
+    }
 
-        // --- Botão Undo ---
-        btnUndo.classList.toggle('hidden', !undoSnapshot);
+    // --- Mode badge (Amistoso) ---
+    if (amistoso) {
+      modeBadge.classList.remove("hidden");
+    } else {
+      modeBadge.classList.add("hidden");
+    }
 
-        // --- Contador de rodadas + jogadores ativos ---
-        if (currentRound > 0) {
-            const totalPlayers = players.length;
-            const activeCount2 = players.filter(p => !p.eliminated).length;
-            roundCounterEl.textContent = `Rodada ${currentRound} · ${activeCount2}/${totalPlayers} jogadores`;
-        } else if (players.length > 0) {
-            roundCounterEl.textContent = `${players.length} jogador${players.length !== 1 ? 'es' : ''}`;
-        } else {
-            roundCounterEl.textContent = '';
-        }
+    // --- Botão Undo ---
+    btnUndo.classList.toggle("hidden", !undoSnapshot);
 
-        // --- Ordenação ---
-        // Antes da Rodada 1: ordem do drag-and-drop (original)
-        // A partir da Rodada 1: ordenado por pontuação (maior → menor)
-        let sorted;
-        if (currentRound === 0) {
-            sorted = [...players];
-        } else {
-            sorted = [...players].sort((a, b) => {
-                if (a.eliminated !== b.eliminated) return a.eliminated ? 1 : -1;
-                return b.score - a.score;
-            });
-        }
+    // --- Contador de rodadas + jogadores ativos ---
+    if (currentRound > 0) {
+      const totalPlayers = players.length;
+      const activeCount2 = players.filter((p) => !p.eliminated).length;
+      roundCounterEl.textContent = `Rodada ${currentRound} · ${activeCount2}/${totalPlayers} jogadores`;
+    } else if (players.length > 0) {
+      roundCounterEl.textContent = `${players.length} jogador${players.length !== 1 ? "es" : ""}`;
+    } else {
+      roundCounterEl.textContent = "";
+    }
 
-        // --- Checar vencedor ---
-        const activePlayers = players.filter(p => !p.eliminated);
-        const hasWinner = activePlayers.length === 1 && players.length > 1 && players.filter(p => p.eliminated).length > 0;
+    // --- Ordenação ---
+    // Antes da Rodada 1: ordem do drag-and-drop (original)
+    // A partir da Rodada 1: ordenado por pontuação (maior → menor)
+    let sorted;
+    if (currentRound === 0) {
+      sorted = [...players];
+    } else {
+      sorted = [...players].sort((a, b) => {
+        if (a.eliminated !== b.eliminated) return a.eliminated ? 1 : -1;
+        return b.score - a.score;
+      });
+    }
 
-        if (hasWinner) {
-            const winner = activePlayers[0];
-            const totalPot = players.reduce((sum, p) => sum + p.debt, 0);
-            const netProfit = totalPot - winner.debt;
+    // --- Checar vencedor ---
+    const activePlayers = players.filter((p) => !p.eliminated);
+    const hasWinner =
+      activePlayers.length === 1 &&
+      players.length > 1 &&
+      players.filter((p) => p.eliminated).length > 0;
 
-            winnerBanner.classList.remove('hidden');
-            winnerNameEl.textContent = winner.name;
+    if (hasWinner) {
+      const winner = activePlayers[0];
+      const totalPot = players.reduce((sum, p) => sum + p.debt, 0);
+      const netProfit = totalPot - winner.debt;
 
-            if (!amistoso) {
-                winnerProfitEl.classList.remove('hidden');
-                winnerProfitEl.textContent = `Lucro Líquido: R$ ${netProfit.toFixed(2)}`;
-            } else {
-                winnerProfitEl.classList.add('hidden');
-            }
+      winnerBanner.classList.remove("hidden");
+      winnerNameEl.textContent = winner.name;
 
-            // Confetti (dispara apenas uma vez)
-            if (!confettiShown) {
-                confettiShown = true;
-                triggerConfetti();
-            }
+      if (!amistoso) {
+        winnerProfitEl.classList.remove("hidden");
+        winnerProfitEl.textContent = `Lucro Líquido: R$ ${netProfit.toFixed(2)}`;
+      } else {
+        winnerProfitEl.classList.add("hidden");
+      }
 
-            // Desabilitar botão de adicionar jogador
-            btnAddPlayer.disabled = true;
-            btnAddPlayer.classList.add('opacity-50', 'pointer-events-none');
-        } else {
-            winnerBanner.classList.add('hidden');
-            btnAddPlayer.disabled = false;
-            btnAddPlayer.classList.remove('opacity-50', 'pointer-events-none');
-        }
+      // Confetti (dispara apenas uma vez)
+      if (!confettiShown) {
+        confettiShown = true;
+        triggerConfetti();
+      }
 
-        // --- Dealer ---
-        const dealerId = getCurrentDealerId();
-        const isDragPhase = currentRound === 0;
+      // Desabilitar botão de adicionar jogador
+      btnAddPlayer.disabled = true;
+      btnAddPlayer.classList.add("opacity-50", "pointer-events-none");
+    } else {
+      winnerBanner.classList.add("hidden");
+      btnAddPlayer.disabled = false;
+      btnAddPlayer.classList.remove("opacity-50", "pointer-events-none");
+    }
 
-        // Layout: coluna única na fase de arraste, grid após
-        if (isDragPhase) {
-            playersListEl.classList.remove('md:grid-cols-2', 'lg:grid-cols-3');
-            playersListEl.classList.add('max-w-lg', 'mx-auto');
-        } else {
-            playersListEl.classList.add('md:grid-cols-2', 'lg:grid-cols-3');
-            playersListEl.classList.remove('max-w-lg', 'mx-auto');
-        }
+    // --- Dealer ---
+    const dealerId = getCurrentDealerId();
+    const isDragPhase = currentRound === 0;
 
-        // --- Lista de jogadores ---
-        if (sorted.length === 0) {
-            playersListEl.innerHTML = `
+    // Layout: coluna única na fase de arraste, grid após
+    if (isDragPhase) {
+      playersListEl.classList.remove("md:grid-cols-2", "lg:grid-cols-3");
+      playersListEl.classList.add("max-w-lg", "mx-auto");
+    } else {
+      playersListEl.classList.add("md:grid-cols-2", "lg:grid-cols-3");
+      playersListEl.classList.remove("max-w-lg", "mx-auto");
+    }
+
+    // --- Lista de jogadores ---
+    if (sorted.length === 0) {
+      playersListEl.innerHTML = `
                 <div class="col-span-full text-center text-white opacity-70 mt-16 animate-fade-in">
                     <i class="fa-solid fa-users text-6xl mb-4 block" aria-hidden="true"></i>
                     <p class="text-xl">Adicione jogadores para começar!</p>
                     <p class="text-base mt-2 opacity-70">Toque no botão <i class="fa-solid fa-user-plus" aria-hidden="true"></i> acima</p>
                 </div>`;
-        } else {
-            let html = '';
+    } else {
+      let html = "";
 
-            // Instrução de arraste (antes da primeira rodada)
-            if (isDragPhase && sorted.length > 1) {
-                html += `<div class="col-span-full text-center text-green-200 text-sm mb-2 animate-fade-in">
+      // Instrução de arraste (antes da primeira rodada)
+      if (isDragPhase && sorted.length > 1) {
+        html += `<div class="col-span-full text-center text-green-200 text-sm mb-2 animate-fade-in">
                     <i class="fa-solid fa-arrows-up-down mr-1" aria-hidden="true"></i>
                     Arraste para organizar a ordem da mesa
                 </div>`;
-            }
+      }
 
-            sorted.forEach((p, index) => {
-                const isWinner = hasWinner && !p.eliminated;
-                const isDealer = p.id === dealerId && !p.eliminated && currentRound > 0;
-                const cardColor = p.eliminated
-                    ? 'bg-gray-400'
-                    : isWinner
-                        ? 'bg-yellow-100 ring-2 ring-yellow-400'
-                        : 'bg-white';
-                const scoreColor = p.score < 0 ? 'bg-red-500 text-white' : getScoreZoneColor(p.score);
-                const textColor = p.eliminated ? 'line-through text-gray-600' : 'text-gray-800';
-                const safeName = escapeHtml(p.name);
+      sorted.forEach((p, index) => {
+        const isWinner = hasWinner && !p.eliminated;
+        const isDealer = p.id === dealerId && !p.eliminated && currentRound > 0;
+        const cardColor = p.eliminated
+          ? "bg-gray-400"
+          : isWinner
+            ? "bg-yellow-100 ring-2 ring-yellow-400"
+            : "bg-white";
+        const scoreColor =
+          p.score < 0 ? "bg-red-500 text-white" : getScoreZoneColor(p.score);
+        const textColor = p.eliminated
+          ? "line-through text-gray-600"
+          : "text-gray-800";
+        const safeName = escapeHtml(p.name);
 
-                // Conteúdo do círculo de score
-                let circleContent;
-                let circleColor;
-                if (p.eliminated) {
-                    circleContent = '<i class="fa-solid fa-skull" aria-hidden="true"></i>';
-                    circleColor = 'bg-black text-white';
-                } else if (isWinner) {
-                    circleContent = '<i class="fa-solid fa-crown" aria-hidden="true"></i>';
-                    circleColor = 'bg-yellow-400 text-yellow-900';
-                } else {
-                    circleContent = p.score;
-                    circleColor = scoreColor;
-                }
+        // Conteúdo do círculo de score
+        let circleContent;
+        let circleColor;
+        if (p.eliminated) {
+          circleContent =
+            '<i class="fa-solid fa-skull" aria-hidden="true"></i>';
+          circleColor = "bg-black text-white";
+        } else if (isWinner) {
+          circleContent =
+            '<i class="fa-solid fa-crown" aria-hidden="true"></i>';
+          circleColor = "bg-yellow-400 text-yellow-900";
+        } else {
+          circleContent = p.score;
+          circleColor = scoreColor;
+        }
 
-                // Posição no ranking
-                let positionBadge = '';
-                if (currentRound > 0 && !p.eliminated) {
-                    const pos = index + 1;
-                    positionBadge = `<span class="text-xs text-gray-400 font-medium">#${pos}</span> `;
-                }
+        // Posição no ranking
+        let positionBadge = "";
+        if (currentRound > 0 && !p.eliminated) {
+          const pos = index + 1;
+          positionBadge = `<span class="text-xs text-gray-400 font-medium">#${pos}</span> `;
+        }
 
-                // Delta da última rodada
-                let deltaHtml = '';
-                if (currentRound > 0 && !p.eliminated) {
-                    const lastLoss = getLastRoundLoss(p.id);
-                    if (lastLoss !== null && lastLoss > 0) {
-                        deltaHtml = `<span class="ml-1.5 text-xs text-red-400 font-medium">▼${lastLoss}</span>`;
-                    } else if (lastLoss === 0) {
-                        deltaHtml = `<span class="ml-1.5 text-xs text-green-500 font-medium">★</span>`;
-                    }
-                }
+        // Delta da última rodada
+        let deltaHtml = "";
+        if (currentRound > 0 && !p.eliminated) {
+          const lastLoss = getLastRoundLoss(p.id);
+          if (lastLoss !== null && lastLoss > 0) {
+            deltaHtml = `<span class="ml-1.5 text-xs text-red-400 font-medium">▼${lastLoss}</span>`;
+          } else if (lastLoss === 0) {
+            deltaHtml = `<span class="ml-1.5 text-xs text-green-500 font-medium">★</span>`;
+          }
+        }
 
-                // Métricas automáticas
-                let metricsHtml = '';
-                if (!p.eliminated && currentRound > 0) {
-                    const parts = [];
-                    if (p.roundsWon > 0) parts.push(`🏆 ${p.roundsWon}`);
-                    if (p.biggestLoss > 0) parts.push(`📉 ${p.biggestLoss}`);
-                    if (parts.length > 0) {
-                        metricsHtml = `<div class="text-xs text-gray-400 mt-0.5">${parts.join(' &nbsp; ')}</div>`;
-                    }
-                }
+        // Métricas automáticas
+        let metricsHtml = "";
+        if (!p.eliminated && currentRound > 0) {
+          const parts = [];
+          if (p.roundsWon > 0) parts.push(`🏆 ${p.roundsWon}`);
+          if (p.biggestLoss > 0) parts.push(`📉 ${p.biggestLoss}`);
+          if (parts.length > 0) {
+            metricsHtml = `<div class="text-xs text-gray-400 mt-0.5">${parts.join(" &nbsp; ")}</div>`;
+          }
+        }
 
-                // Dívida (oculta no modo amistoso)
-                let debtHtml = '';
-                if (!amistoso && !p.eliminated && p.debt > 0) {
-                    const moneyText = p.hasPaid ? 'Pago' : `Deve R$ ${p.debt.toFixed(2)}`;
-                    debtHtml = `<div class="text-sm text-gray-500 truncate">${moneyText}</div>`;
-                }
+        // Dívida (oculta no modo amistoso)
+        let debtHtml = "";
+        if (!amistoso && !p.eliminated && p.debt > 0) {
+          const moneyText = p.hasPaid ? "Pago" : `Deve R$ ${p.debt.toFixed(2)}`;
+          debtHtml = `<div class="text-sm text-gray-500 truncate">${moneyText}</div>`;
+        }
 
-                // Info do vencedor
-                let winnerInfo = '';
-                if (isWinner && !amistoso) {
-                    const totalPot = players.reduce((sum, pl) => sum + pl.debt, 0);
-                    const netProfit = totalPot - p.debt;
-                    winnerInfo = `<div class="text-sm text-yellow-600 font-bold">Vencedor! Lucro: R$ ${netProfit.toFixed(2)}</div>`;
-                } else if (isWinner) {
-                    winnerInfo = '<div class="text-sm text-yellow-600 font-bold">Vencedor!</div>';
-                }
+        // Info do vencedor
+        let winnerInfo = "";
+        if (isWinner && !amistoso) {
+          const totalPot = players.reduce((sum, pl) => sum + pl.debt, 0);
+          const netProfit = totalPot - p.debt;
+          winnerInfo = `<div class="text-sm text-yellow-600 font-bold">Vencedor! Lucro: R$ ${netProfit.toFixed(2)}</div>`;
+        } else if (isWinner) {
+          winnerInfo =
+            '<div class="text-sm text-yellow-600 font-bold">Vencedor!</div>';
+        }
 
-                // Badge do dealer
-                let dealerBadge = '';
-                if (isDealer) {
-                    dealerBadge = '<span class="dealer-badge" title="Dealer">🃏</span>';
-                }
+        // Badge do dealer
+        let dealerBadge = "";
+        if (isDealer) {
+          dealerBadge = '<span class="dealer-badge" title="Dealer">🃏</span>';
+        }
 
-                // Handle de arraste (apenas antes da primeira rodada)
-                let dragHandle = '';
-                if (isDragPhase && !p.eliminated) {
-                    dragHandle = `<div class="drag-handle shrink-0 cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 px-1">
+        // Handle de arraste (apenas antes da primeira rodada)
+        let dragHandle = "";
+        if (isDragPhase && !p.eliminated) {
+          dragHandle = `<div class="drag-handle shrink-0 cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 px-1">
                         <i class="fa-solid fa-grip-vertical text-lg" aria-hidden="true"></i>
                     </div>`;
-                }
+        }
 
-                // Botão de pagamento (oculto no modo amistoso)
-                let paymentBtn = '';
-                if (!p.eliminated && !amistoso && p.debt > 0) {
-                    const moneyIcon = p.hasPaid ? 'text-green-600 fa-circle-check' : 'text-red-500 fa-sack-dollar';
-                    paymentBtn = `
+        // Botão de pagamento (oculto no modo amistoso)
+        let paymentBtn = "";
+        if (!p.eliminated && !amistoso && p.debt > 0) {
+          const moneyIcon = p.hasPaid
+            ? "text-green-600 fa-circle-check"
+            : "text-red-500 fa-sack-dollar";
+          paymentBtn = `
                     <button type="button" data-toggle-payment="${p.id}"
                         class="shrink-0 text-3xl active:scale-90 transition-all focus:ring-2 focus:ring-green-300 focus:outline-none rounded-full min-h-[48px] min-w-[48px] flex items-center justify-center"
-                        aria-label="${p.hasPaid ? 'Desmarcar pagamento de ' + safeName : 'Marcar pagamento de ' + safeName}">
+                        aria-label="${p.hasPaid ? "Desmarcar pagamento de " + safeName : "Marcar pagamento de " + safeName}">
                         <i class="fa-solid ${moneyIcon}" aria-hidden="true"></i>
                     </button>`;
-                }
+        }
 
-                html += `
+        html += `
                 <div class="player-card ${cardColor} rounded-2xl shadow-md p-4 flex items-center gap-3 animate-slide-up relative"
                     style="animation-delay: ${index * 0.05}s"
                     data-player-id="${p.id}"
-                    ${isDragPhase && !p.eliminated ? 'draggable="true"' : ''}>
+                    ${isDragPhase && !p.eliminated ? 'draggable="true"' : ""}>
                     ${dealerBadge}
                     ${dragHandle}
                     <div class="shrink-0 w-12 h-12 rounded-full flex items-center justify-center font-bold text-base ${circleColor}">
@@ -1021,105 +1099,109 @@ const App = (() => {
                     </div>
                     ${paymentBtn}
                 </div>`;
-            });
-            playersListEl.innerHTML = html;
-        }
-
-        // --- Controle do botão de fechar rodada ---
-        const activeCount = activePlayers.length;
-        btnEndRound.disabled = activeCount < 2;
-
-        if (hasWinner) {
-            btnEndRound.disabled = true;
-            btnEndRound.textContent = 'JOGO ENCERRADO';
-        } else {
-            btnEndRound.textContent = 'FECHAR RODADA';
-        }
+      });
+      playersListEl.innerHTML = html;
     }
 
-    // =============================================
-    // EVENT LISTENERS
-    // =============================================
+    // --- Controle do botão de fechar rodada ---
+    const activeCount = activePlayers.length;
+    btnEndRound.disabled = activeCount < 2;
 
-    function init() {
-        // Tela de setup - seleção de modo
-        $('btn-mode-amistoso').addEventListener('click', startAmistoso);
-        $('btn-mode-apostado').addEventListener('click', showApostadoFields);
-        $('btn-back-mode').addEventListener('click', () => {
-            apostadoFields.classList.add('hidden');
-            modeSelection.classList.remove('hidden');
-            entryFeeInput.value = '';
-            rebuyFeeInput.value = '';
-        });
-        $('btn-start-game').addEventListener('click', startApostado);
-
-        // Enter nos inputs de setup (modo apostado)
-        entryFeeInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') rebuyFeeInput.focus();
-        });
-        rebuyFeeInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') startApostado();
-        });
-
-        // Header do jogo
-        $('btn-new-game').addEventListener('click', newGame);
-        $('btn-add-player').addEventListener('click', () => {
-            newPlayerNameInput.value = '';
-            modalAddPlayer.showModal();
-            setTimeout(() => newPlayerNameInput.focus(), 100);
-        });
-        $('btn-history').addEventListener('click', openHistory);
-        $('btn-help').addEventListener('click', () => modalHelp.showModal());
-        $('btn-close-help').addEventListener('click', () => modalHelp.close());
-        btnUndo.addEventListener('click', undo);
-        $('btn-restart-game').addEventListener('click', newGame);
-
-        // Modal adicionar jogador
-        $('btn-confirm-add').addEventListener('click', confirmAddPlayer);
-        $('btn-cancel-add').addEventListener('click', () => modalAddPlayer.close());
-        newPlayerNameInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') confirmAddPlayer();
-        });
-
-        // Modal fim de rodada
-        btnEndRound.addEventListener('click', openEndRoundModal);
-        $('btn-process-round').addEventListener('click', processRound);
-        $('btn-cancel-round').addEventListener('click', () => modalEndRound.close());
-
-        // Modal histórico
-        $('btn-close-history').addEventListener('click', () => modalHistory.close());
-
-        // Delegação de evento para botões de pagamento
-        playersListEl.addEventListener('click', (e) => {
-            const btn = e.target.closest('[data-toggle-payment]');
-            if (btn) {
-                const id = parseInt(btn.dataset.togglePayment);
-                togglePayment(id);
-            }
-        });
-
-        // Drag and drop (ordem da mesa)
-        setupDragAndDrop();
-
-        // Prevenir perda acidental
-        window.addEventListener('beforeunload', (e) => {
-            if (gameStarted && players.length > 0) {
-                e.preventDefault();
-            }
-        });
-
-        // Restaurar jogo salvo
-        if (loadState()) {
-            restoreGame();
-        }
-    }
-
-    // Iniciar quando DOM estiver pronto
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
+    if (hasWinner) {
+      btnEndRound.disabled = true;
+      btnEndRound.textContent = "JOGO ENCERRADO";
     } else {
-        init();
+      btnEndRound.textContent = "FECHAR RODADA";
     }
+  }
 
-    return { showToast };
+  // =============================================
+  // EVENT LISTENERS
+  // =============================================
+
+  function init() {
+    // Tela de setup - seleção de modo
+    $("btn-mode-amistoso").addEventListener("click", startAmistoso);
+    $("btn-mode-apostado").addEventListener("click", showApostadoFields);
+    $("btn-back-mode").addEventListener("click", () => {
+      apostadoFields.classList.add("hidden");
+      modeSelection.classList.remove("hidden");
+      entryFeeInput.value = "";
+      rebuyFeeInput.value = "";
+    });
+    $("btn-start-game").addEventListener("click", startApostado);
+
+    // Enter nos inputs de setup (modo apostado)
+    entryFeeInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") rebuyFeeInput.focus();
+    });
+    rebuyFeeInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") startApostado();
+    });
+
+    // Header do jogo
+    $("btn-new-game").addEventListener("click", newGame);
+    $("btn-add-player").addEventListener("click", () => {
+      newPlayerNameInput.value = "";
+      modalAddPlayer.showModal();
+      setTimeout(() => newPlayerNameInput.focus(), 100);
+    });
+    $("btn-history").addEventListener("click", openHistory);
+    $("btn-help").addEventListener("click", () => modalHelp.showModal());
+    $("btn-close-help").addEventListener("click", () => modalHelp.close());
+    btnUndo.addEventListener("click", undo);
+    $("btn-restart-game").addEventListener("click", newGame);
+
+    // Modal adicionar jogador
+    $("btn-confirm-add").addEventListener("click", confirmAddPlayer);
+    $("btn-cancel-add").addEventListener("click", () => modalAddPlayer.close());
+    newPlayerNameInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") confirmAddPlayer();
+    });
+
+    // Modal fim de rodada
+    btnEndRound.addEventListener("click", openEndRoundModal);
+    $("btn-process-round").addEventListener("click", processRound);
+    $("btn-cancel-round").addEventListener("click", () =>
+      modalEndRound.close(),
+    );
+
+    // Modal histórico
+    $("btn-close-history").addEventListener("click", () =>
+      modalHistory.close(),
+    );
+
+    // Delegação de evento para botões de pagamento
+    playersListEl.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-toggle-payment]");
+      if (btn) {
+        const id = parseInt(btn.dataset.togglePayment);
+        togglePayment(id);
+      }
+    });
+
+    // Drag and drop (ordem da mesa)
+    setupDragAndDrop();
+
+    // Prevenir perda acidental
+    window.addEventListener("beforeunload", (e) => {
+      if (gameStarted && players.length > 0) {
+        e.preventDefault();
+      }
+    });
+
+    // Restaurar jogo salvo
+    if (loadState()) {
+      restoreGame();
+    }
+  }
+
+  // Iniciar quando DOM estiver pronto
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+
+  return { showToast };
 })();
