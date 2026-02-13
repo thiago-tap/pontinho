@@ -96,26 +96,29 @@ const App = (() => {
 
       let resolved = false;
 
-      function onYes() {
+      function resolveAndClose(value) {
         if (!resolved) {
           resolved = true;
           modalConfirm.close();
-          resolve(true);
+          // Aguardar para garantir que o modal foi totalmente fechado
+          // antes de resolver a Promise. Isso é crítico para múltiplos modais
+          // abrirem sequencialmente (caso de múltiplos estouros)
+          setTimeout(() => resolve(value), 50);
         }
       }
 
+      function onYes() {
+        resolveAndClose(true);
+      }
+
       function onNo() {
-        if (!resolved) {
-          resolved = true;
-          modalConfirm.close();
-          resolve(false);
-        }
+        resolveAndClose(false);
       }
 
       function onClose() {
         if (!resolved) {
           resolved = true;
-          resolve(false);
+          setTimeout(() => resolve(false), 50);
         }
       }
 
@@ -561,6 +564,8 @@ const App = (() => {
       if (!proceed) return;
     }
 
+    // Tirar snapshot UMA ÚNICA VEZ antes de toda a operação
+    // Isso permite que Undo reverta toda a rodada + estouros em uma única ação
     takeSnapshot();
 
     // Travar originalOrder na primeira rodada (se ainda vazio)
@@ -605,6 +610,7 @@ const App = (() => {
 
     modalEndRound.close();
     saveState();
+    // checkEstouros não tira snapshot porque já foi feito acima
     await checkEstouros();
   }
 
@@ -613,17 +619,24 @@ const App = (() => {
   // =============================================
 
   async function checkEstouros() {
+    // IMPORTANTE: O snapshot é tirado pelo chamador (processRound)
+    // Não tiramos snapshot aqui porque já foi feito ANTES de processar a rodada.
+    // Isso garante que Undo reverte toda a rodada + estouros em uma ação.
+
     for (const player of players) {
       if (!player.eliminated && player.score < 0) {
         // Feedback tátil no mobile
         navigator.vibrate?.(200);
 
-        const survivors = players.filter(
-          (p) => p.score >= 0 && !p.eliminated,
+        // Contar jogadores ativos AGORA (excluindo este que estourou)
+        // Isso é recalculado a cada iteração em caso de múltiplos estouros
+        const activeExcludingThis = players.filter(
+          (p) => p.id !== player.id && !p.eliminated && p.score >= 0,
         ).length;
 
-        // Reentrada só é permitida se houver >= 2 sobreviventes
-        if (survivors >= 2) {
+        // Reentrada permitida se há pelo menos 1 outro jogador ativo
+        // Ao reentrar, o jogador voltaria ao jogo (mínimo 2 ativos totais)
+        if (activeExcludingThis >= 1) {
           const rebuyMsg = isAmistoso()
             ? `Pontuação: ${player.score}. Deseja voltar ao jogo?`
             : `Pontuação: ${player.score}. Deseja pagar a volta (R$ ${config.rebuy.toFixed(2)})?`;
@@ -634,7 +647,7 @@ const App = (() => {
           );
 
           if (confirmed) {
-            takeSnapshot();
+            // Reentrada confirmada: restaurar pontuação e ajustar dívida
             const targetScore = getLowestPositiveScore();
             player.score = targetScore;
             player.debt += config.rebuy;
@@ -644,20 +657,21 @@ const App = (() => {
               "info",
             );
           } else {
-            takeSnapshot();
+            // Jogador recusou reentrada
             player.eliminated = true;
             showToast(`${player.name} foi eliminado!`, "error");
           }
         } else {
-          // Reentrada proibida: <= 1 sobrevivente
+          // Nenhum outro jogador ativo: eliminação automática
           player.eliminated = true;
           showToast(
-            `${player.name} foi eliminado! Reentrada proibida.`,
+            `${player.name} foi eliminado! Não há jogadores suficientes para reentrada.`,
             "error",
           );
         }
       }
     }
+
     saveState();
     renderGame();
   }
