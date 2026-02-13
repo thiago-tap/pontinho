@@ -70,6 +70,43 @@ input[type="number"]::-webkit-outer-spin-button {
     }
 }
 
+/* --- Drag Handle --- */
+.drag-handle {
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+/* --- Drag Ghost (touch) --- */
+.player-card[draggable="true"] {
+    cursor: grab;
+}
+
+.player-card[draggable="true"]:active {
+    cursor: grabbing;
+}
+
+.player-card.dragging {
+    opacity: 0.4;
+}
+
+/* --- Dealer Badge --- */
+.dealer-badge {
+    position: absolute;
+    top: -4px;
+    left: -4px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #3b82f6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    z-index: 2;
+}
+
 /* --- Scrollbar sutil na lista de jogadores --- */
 #players-list::-webkit-scrollbar {
     width: 4px;

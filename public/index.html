@@ -72,39 +72,70 @@
             <i class="fa-solid fa-layer-group text-white text-7xl mb-3" aria-hidden="true"></i>
             <h1 class="text-5xl font-bold text-white mb-8">PONTINHO</h1>
 
-            <div class="w-full md:max-w-md bg-white rounded-2xl shadow-lg p-5 mb-4">
-                <label for="entry-fee" class="block text-gray-600 text-sm font-bold mb-2">Valor da Entrada (R$)</label>
-                <input type="number" id="entry-fee" min="0" step="0.01"
-                    class="w-full text-xl p-3 border-b-2 border-green-500 outline-none focus:bg-green-50 focus:ring-2 focus:ring-green-300 rounded min-h-[52px]"
-                    placeholder="0.00" inputmode="decimal">
+            <!-- Escolha do Modo -->
+            <div id="mode-selection" class="w-full md:max-w-md flex flex-col gap-4">
+                <button type="button" id="btn-mode-apostado"
+                    class="w-full bg-white text-green-900 font-bold py-5 rounded-2xl shadow-lg hover:bg-gray-100 active:scale-95 transition-all focus:ring-4 focus:ring-green-300 focus:outline-none min-h-[56px] text-xl flex items-center justify-center gap-3">
+                    <i class="fa-solid fa-coins text-yellow-500 text-2xl" aria-hidden="true"></i>
+                    APOSTADO
+                </button>
+                <button type="button" id="btn-mode-amistoso"
+                    class="w-full bg-white text-green-900 font-bold py-5 rounded-2xl shadow-lg hover:bg-gray-100 active:scale-95 transition-all focus:ring-4 focus:ring-green-300 focus:outline-none min-h-[56px] text-xl flex items-center justify-center gap-3">
+                    <i class="fa-solid fa-handshake text-green-500 text-2xl" aria-hidden="true"></i>
+                    AMISTOSO
+                </button>
             </div>
 
-            <div class="w-full md:max-w-md bg-white rounded-2xl shadow-lg p-5 mb-6">
-                <label for="rebuy-fee" class="block text-gray-600 text-sm font-bold mb-2">Valor da Reentrada (R$)</label>
-                <input type="number" id="rebuy-fee" min="0" step="0.01"
-                    class="w-full text-xl p-3 border-b-2 border-green-500 outline-none focus:bg-green-50 focus:ring-2 focus:ring-green-300 rounded min-h-[52px]"
-                    placeholder="0.00" inputmode="decimal">
-            </div>
+            <!-- Campos de valor (só aparece no modo Apostado) -->
+            <div id="apostado-fields" class="hidden w-full md:max-w-md animate-slide-up">
+                <button type="button" id="btn-back-mode"
+                    class="flex items-center gap-2 text-white opacity-80 hover:opacity-100 transition-all mb-2 mt-2 focus:outline-none active:scale-95">
+                    <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+                    <span class="text-sm font-medium">Voltar</span>
+                </button>
+                <div class="bg-white rounded-2xl shadow-lg p-5 mb-4">
+                    <label for="entry-fee" class="block text-gray-600 text-sm font-bold mb-2">Valor da Entrada (R$)</label>
+                    <input type="number" id="entry-fee" min="0.01" step="0.01"
+                        class="w-full text-xl p-3 border-b-2 border-green-500 outline-none focus:bg-green-50 focus:ring-2 focus:ring-green-300 rounded min-h-[52px]"
+                        placeholder="0.00" inputmode="decimal">
+                </div>
 
-            <button type="button" id="btn-start-game"
-                class="w-full md:max-w-md bg-white text-green-900 font-bold py-5 rounded-full shadow-lg hover:bg-gray-100 active:scale-95 transition-all focus:ring-4 focus:ring-green-300 focus:outline-none min-h-[56px] text-xl">
-                ABRIR MESA
-            </button>
+                <div class="bg-white rounded-2xl shadow-lg p-5 mb-6">
+                    <label for="rebuy-fee" class="block text-gray-600 text-sm font-bold mb-2">Valor da Reentrada (R$)</label>
+                    <input type="number" id="rebuy-fee" min="0.01" step="0.01"
+                        class="w-full text-xl p-3 border-b-2 border-green-500 outline-none focus:bg-green-50 focus:ring-2 focus:ring-green-300 rounded min-h-[52px]"
+                        placeholder="0.00" inputmode="decimal">
+                </div>
+
+                <button type="button" id="btn-start-game"
+                    class="w-full bg-yellow-500 text-yellow-900 font-bold py-5 rounded-full shadow-lg hover:bg-yellow-400 active:scale-95 transition-all focus:ring-4 focus:ring-yellow-300 focus:outline-none min-h-[56px] text-xl">
+                    <i class="fa-solid fa-coins mr-2" aria-hidden="true"></i>
+                    ABRIR MESA
+                </button>
+            </div>
         </section>
 
         <!-- Tela do Jogo -->
         <section id="game-screen" class="hidden flex-col min-h-screen animate-fade-in" aria-label="Jogo em andamento">
             <header class="bg-green-900 px-4 py-3 md:px-6 shadow-md flex justify-between items-center sticky top-0 z-10 safe-top">
                 <div class="flex items-center gap-3">
-                    <button type="button" id="btn-new-game" aria-label="Nova mesa"
+                    <button type="button" id="btn-new-game" aria-label="Voltar ao início"
                         class="text-white text-lg hover:text-yellow-300 active:scale-95 transition-all focus:ring-2 focus:ring-yellow-300 focus:outline-none rounded-full w-11 h-11 flex items-center justify-center min-h-[44px]">
+                        <i class="fa-solid fa-house" aria-hidden="true"></i>
+                    </button>
+                    <button type="button" id="btn-undo" aria-label="Desfazer última ação"
+                        class="hidden bg-yellow-500 text-yellow-900 text-sm hover:bg-yellow-400 active:scale-95 transition-all focus:ring-2 focus:ring-yellow-300 focus:outline-none rounded-full w-9 h-9 flex items-center justify-center min-h-[36px] shadow">
                         <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
                     </button>
-                    <div class="text-white font-bold text-xl">
+                    <div id="pot-container" class="text-white font-bold text-xl">
                         Pote: R$ <span id="total-pot">0.00</span>
                     </div>
                 </div>
                 <div class="flex items-center gap-2">
+                    <button type="button" id="btn-help" aria-label="Como jogar"
+                        class="bg-green-700 text-white text-lg p-2 rounded-full hover:bg-green-600 active:scale-95 transition-all w-11 h-11 flex items-center justify-center shadow-lg focus:ring-2 focus:ring-green-300 focus:outline-none min-h-[44px]">
+                        <i class="fa-solid fa-circle-question" aria-hidden="true"></i>
+                    </button>
                     <button type="button" id="btn-history" aria-label="Histórico de rodadas"
                         class="bg-green-700 text-white text-lg p-2 rounded-full hover:bg-green-600 active:scale-95 transition-all w-11 h-11 flex items-center justify-center shadow-lg focus:ring-2 focus:ring-green-300 focus:outline-none min-h-[44px]">
                         <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i>
@@ -121,6 +152,7 @@
                 <i class="fa-solid fa-trophy mr-2" aria-hidden="true"></i>
                 <span id="winner-name"></span> VENCEU!
                 <i class="fa-solid fa-trophy ml-2" aria-hidden="true"></i>
+                <div id="winner-profit" class="hidden text-base font-semibold mt-1"></div>
             </div>
 
             <div id="players-list" class="flex-grow overflow-y-auto p-3 md:p-6 pb-28 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 content-start">
@@ -213,6 +245,59 @@
             <button type="button" id="btn-close-history"
                 class="w-full py-3 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 active:scale-95 transition-all focus:ring-2 focus:ring-green-300 focus:outline-none min-h-[44px]">
                 Fechar
+            </button>
+        </div>
+    </dialog>
+
+    <!-- Modal: Como Jogar -->
+    <dialog id="modal-help" class="w-full max-w-lg rounded-lg">
+        <div class="bg-white rounded-lg p-6 max-h-[85vh] flex flex-col">
+            <h2 class="text-xl font-bold mb-4 text-green-800">
+                <i class="fa-solid fa-circle-question text-green-600 mr-2" aria-hidden="true"></i>
+                Como Jogar
+            </h2>
+            <div class="overflow-y-auto flex-grow mb-4 space-y-4 text-sm text-gray-700 leading-relaxed">
+
+                <div>
+                    <h3 class="font-bold text-green-700 mb-1"><i class="fa-solid fa-play mr-1" aria-hidden="true"></i> Iniciando</h3>
+                    <p>Escolha o modo <strong>Apostado</strong> (com valores em R$) ou <strong>Amistoso</strong> (sem dinheiro). Adicione os jogadores e arraste para organizar a ordem dos assentos na mesa.</p>
+                </div>
+
+                <div>
+                    <h3 class="font-bold text-green-700 mb-1"><i class="fa-solid fa-star mr-1" aria-hidden="true"></i> Pontuação</h3>
+                    <p>Todos começam com <strong>99 pontos</strong>. A cada rodada, informe quantos pontos cada jogador <strong>perdeu</strong>. Quem "bateu" (ganhou a rodada) recebe <strong>0</strong>.</p>
+                </div>
+
+                <div>
+                    <h3 class="font-bold text-green-700 mb-1"><i class="fa-solid fa-explosion mr-1" aria-hidden="true"></i> Estouro</h3>
+                    <p>Se a pontuação ficar <strong>abaixo de zero</strong>, o jogador estourou! Ele pode pagar a <strong>Reentrada</strong> e voltar com a menor pontuação da mesa, ou ser <strong>eliminado</strong>.</p>
+                    <p class="mt-1 text-gray-500">A reentrada só é permitida se houver pelo menos 2 jogadores ativos.</p>
+                </div>
+
+                <div>
+                    <h3 class="font-bold text-green-700 mb-1"><i class="fa-solid fa-user-plus mr-1" aria-hidden="true"></i> Entrada Tardia</h3>
+                    <p>Jogadores que entrarem após o início da partida recebem a <strong>menor pontuação positiva</strong> da mesa (em vez de 99).</p>
+                </div>
+
+                <div>
+                    <h3 class="font-bold text-green-700 mb-1"><i class="fa-solid fa-shuffle mr-1" aria-hidden="true"></i> Dealer</h3>
+                    <p>O Dealer 🃏 avança a cada rodada seguindo a ordem original da mesa. Jogadores eliminados são pulados automaticamente.</p>
+                </div>
+
+                <div>
+                    <h3 class="font-bold text-green-700 mb-1"><i class="fa-solid fa-trophy mr-1" aria-hidden="true"></i> Vitória</h3>
+                    <p>O jogo encerra quando restar apenas <strong>1 jogador ativo</strong>. No modo apostado, o lucro do vencedor é calculado automaticamente.</p>
+                </div>
+
+                <div>
+                    <h3 class="font-bold text-green-700 mb-1"><i class="fa-solid fa-rotate-left mr-1" aria-hidden="true"></i> Desfazer</h3>
+                    <p>Errou na digitação? Use o botão <strong class="text-yellow-600">Desfazer</strong> (amarelo no topo) para reverter a última ação.</p>
+                </div>
+
+            </div>
+            <button type="button" id="btn-close-help"
+                class="w-full py-3 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 active:scale-95 transition-all focus:ring-2 focus:ring-green-300 focus:outline-none min-h-[44px]">
+                Entendi!
             </button>
         </div>
     </dialog>

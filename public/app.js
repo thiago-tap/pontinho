@@ -12,27 +12,36 @@ const App = (() => {
     let currentRound = 0;
     let nextId = 1;
     let gameStarted = false;
+    let originalOrder = [];     // Ordem física da mesa (IDs dos jogadores)
+    let dealerIndex = 0;        // Índice em originalOrder para o dealer atual
+    let undoSnapshot = null;    // Último snapshot para desfazer
 
     // --- REFERÊNCIAS DOM ---
     const $ = (id) => document.getElementById(id);
     const setupScreen = $('setup-screen');
     const gameScreen = $('game-screen');
+    const modeSelection = $('mode-selection');
+    const apostadoFields = $('apostado-fields');
     const entryFeeInput = $('entry-fee');
     const rebuyFeeInput = $('rebuy-fee');
     const totalPotEl = $('total-pot');
+    const potContainer = $('pot-container');
     const playersListEl = $('players-list');
     const btnEndRound = $('btn-end-round');
     const newPlayerNameInput = $('new-player-name');
     const roundInputsEl = $('round-inputs');
     const winnerBanner = $('winner-banner');
     const winnerNameEl = $('winner-name');
+    const winnerProfitEl = $('winner-profit');
     const roundCounterEl = $('round-counter');
     const toastContainer = $('toast-container');
+    const btnUndo = $('btn-undo');
 
     const modalAddPlayer = $('modal-add-player');
     const modalEndRound = $('modal-end-round');
     const modalConfirm = $('modal-confirm');
     const modalHistory = $('modal-history');
+    const modalHelp = $('modal-help');
 
     // =============================================
     // UTILITÁRIOS
@@ -42,6 +51,11 @@ const App = (() => {
         const div = document.createElement('div');
         div.textContent = str;
         return div.innerHTML;
+    }
+
+    /** Modo amistoso: sem cobranças quando entrada e reentrada são R$ 0,00 */
+    function isAmistoso() {
+        return config.entry === 0 && config.rebuy === 0;
     }
 
     function showToast(message, type = 'info') {
@@ -96,7 +110,10 @@ const App = (() => {
 
     function saveState() {
         try {
-            const state = { players, config, roundHistory, currentRound, nextId, gameStarted };
+            const state = {
+                players, config, roundHistory, currentRound, nextId, gameStarted,
+                originalOrder, dealerIndex, undoSnapshot,
+            };
             localStorage.setItem('pontinho-state', JSON.stringify(state));
         } catch (e) {
             // Silently fail if storage is full
@@ -114,6 +131,16 @@ const App = (() => {
             currentRound = state.currentRound || 0;
             nextId = state.nextId || 1;
             gameStarted = state.gameStarted || false;
+            originalOrder = state.originalOrder || [];
+            dealerIndex = state.dealerIndex || 0;
+            undoSnapshot = state.undoSnapshot || null;
+
+            // Migração: adiciona campos novos a jogadores antigos
+            players.forEach(p => {
+                if (p.roundsWon === undefined) p.roundsWon = 0;
+                if (p.biggestLoss === undefined) p.biggestLoss = 0;
+            });
+
             return gameStarted;
         } catch (e) {
             return false;
@@ -125,15 +152,69 @@ const App = (() => {
     }
 
     // =============================================
+    // SISTEMA UNDO (Ponto de Restauração)
+    // =============================================
+
+    /** Salva um snapshot do estado atual antes de cada processamento */
+    function takeSnapshot() {
+        undoSnapshot = {
+            players: JSON.parse(JSON.stringify(players)),
+            roundHistory: JSON.parse(JSON.stringify(roundHistory)),
+            currentRound,
+            dealerIndex,
+            originalOrder: [...originalOrder],
+        };
+    }
+
+    /** Restaura o último snapshot salvo */
+    function undo() {
+        if (!undoSnapshot) {
+            showToast('Nada para desfazer!', 'warning');
+            return;
+        }
+        players = undoSnapshot.players;
+        roundHistory = undoSnapshot.roundHistory;
+        currentRound = undoSnapshot.currentRound;
+        dealerIndex = undoSnapshot.dealerIndex;
+        originalOrder = undoSnapshot.originalOrder;
+        undoSnapshot = null;
+        saveState();
+        renderGame();
+        showToast('Ação desfeita!', 'info');
+    }
+
+    // =============================================
     // NAVEGAÇÃO
     // =============================================
 
-    function startGame() {
-        const entryVal = parseFloat(entryFeeInput.value);
-        const rebuyVal = parseFloat(rebuyFeeInput.value);
+    /** Modo amistoso: entra direto sem valores */
+    function startAmistoso() {
+        config.entry = 0;
+        config.rebuy = 0;
+        gameStarted = true;
 
-        if (isNaN(entryVal) || isNaN(rebuyVal) || entryVal < 0 || rebuyVal < 0) {
-            showToast('Preencha valores válidos (>= 0) para entrada e reentrada!', 'error');
+        setupScreen.classList.add('hidden');
+        gameScreen.classList.remove('hidden');
+        gameScreen.classList.add('flex');
+
+        saveState();
+        renderGame();
+    }
+
+    /** Mostra os campos de valor para o modo apostado */
+    function showApostadoFields() {
+        modeSelection.classList.add('hidden');
+        apostadoFields.classList.remove('hidden');
+        setTimeout(() => entryFeeInput.focus(), 100);
+    }
+
+    /** Modo apostado: valida valores e inicia */
+    function startApostado() {
+        const entryVal = parseFloat(entryFeeInput.value) || 0;
+        const rebuyVal = parseFloat(rebuyFeeInput.value) || 0;
+
+        if (entryVal <= 0 || rebuyVal <= 0) {
+            showToast('Preencha valores maiores que zero!', 'error');
             return;
         }
 
@@ -169,6 +250,9 @@ const App = (() => {
         currentRound = 0;
         nextId = 1;
         gameStarted = false;
+        originalOrder = [];
+        dealerIndex = 0;
+        undoSnapshot = null;
 
         clearState();
 
@@ -178,6 +262,8 @@ const App = (() => {
 
         entryFeeInput.value = '';
         rebuyFeeInput.value = '';
+        modeSelection.classList.remove('hidden');
+        apostadoFields.classList.add('hidden');
         winnerBanner.classList.add('hidden');
         roundCounterEl.textContent = '';
 
@@ -188,10 +274,17 @@ const App = (() => {
     // LÓGICA CORE
     // =============================================
 
-    function getLowestScore() {
+    /** Busca a menor pontuação positiva (> 0) da mesa. Fallback para >= 0, depois 99. */
+    function getLowestPositiveScore() {
+        const positivePlayers = players.filter(p => !p.eliminated && p.score > 0);
+        if (positivePlayers.length > 0) {
+            return Math.min(...positivePlayers.map(p => p.score));
+        }
         const activePlayers = players.filter(p => !p.eliminated && p.score >= 0);
-        if (activePlayers.length === 0) return 99;
-        return Math.min(...activePlayers.map(p => p.score));
+        if (activePlayers.length > 0) {
+            return Math.min(...activePlayers.map(p => p.score));
+        }
+        return 99;
     }
 
     function confirmAddPlayer() {
@@ -209,22 +302,36 @@ const App = (() => {
             return;
         }
 
-        const startScore = (players.filter(p => !p.eliminated).length > 0) ? getLowestScore() : 99;
+        takeSnapshot();
 
-        players.push({
+        // Entrada tardia: se já houve rodada, recebe a menor pontuação positiva
+        const isLateEntry = currentRound > 0;
+        const startScore = isLateEntry ? getLowestPositiveScore() : 99;
+
+        const newPlayer = {
             id: nextId++,
             name: name,
             score: startScore,
             debt: config.entry,
             hasPaid: false,
             eliminated: false,
-        });
+            roundsWon: 0,
+            biggestLoss: 0,
+        };
+
+        players.push(newPlayer);
+        originalOrder.push(newPlayer.id);
 
         newPlayerNameInput.value = '';
         modalAddPlayer.close();
         saveState();
         renderGame();
-        showToast(`${name} entrou na mesa!`, 'success');
+
+        if (isLateEntry) {
+            showToast(`${name} entrou com ${startScore} pontos!`, 'success');
+        } else {
+            showToast(`${name} entrou na mesa!`, 'success');
+        }
     }
 
     function togglePayment(id) {
@@ -241,6 +348,31 @@ const App = (() => {
     }
 
     // =============================================
+    // DEALER (Distribuidor)
+    // =============================================
+
+    /** Retorna o ID do jogador que é o dealer atual */
+    function getCurrentDealerId() {
+        if (originalOrder.length === 0) return null;
+        if (dealerIndex >= originalOrder.length) dealerIndex = 0;
+        return originalOrder[dealerIndex];
+    }
+
+    /** Avança o dealer para o próximo jogador ativo na ordem original */
+    function advanceDealer() {
+        if (originalOrder.length === 0) return;
+
+        let attempts = 0;
+        do {
+            dealerIndex = (dealerIndex + 1) % originalOrder.length;
+            attempts++;
+            const playerId = originalOrder[dealerIndex];
+            const player = players.find(p => p.id === playerId);
+            if (player && !player.eliminated) return;
+        } while (attempts < originalOrder.length);
+    }
+
+    // =============================================
     // RODADA
     // =============================================
 
@@ -249,12 +381,17 @@ const App = (() => {
         container.innerHTML = '';
 
         const activePlayers = players.filter(p => !p.eliminated);
+        const dealerId = getCurrentDealerId();
+
         let html = '';
         activePlayers.forEach(p => {
             const safeName = escapeHtml(p.name);
+            const isDealer = p.id === dealerId && currentRound > 0;
             html += `
                 <div class="flex items-center gap-3 bg-gray-50 p-4 rounded-xl">
-                    <span class="font-bold text-gray-700 text-base truncate min-w-0 flex-1">${safeName}</span>
+                    <span class="font-bold text-gray-700 text-base truncate min-w-0 flex-1">
+                        ${isDealer ? '🃏 ' : ''}${safeName}
+                    </span>
                     <input type="number" data-player-id="${p.id}" min="0"
                         class="round-score-input shrink-0 w-24 border-2 border-gray-200 rounded-lg p-3 text-center text-lg focus:border-green-500 focus:ring-2 focus:ring-green-300 focus:outline-none min-h-[48px]"
                         placeholder="0" inputmode="numeric">
@@ -269,21 +406,40 @@ const App = (() => {
     }
 
     function processRound() {
+        // Validação: impedir valores negativos
+        const inputs = document.querySelectorAll('#round-inputs [data-player-id]');
+        for (const input of inputs) {
+            const val = parseInt(input.value) || 0;
+            if (val < 0) {
+                showToast('Valores não podem ser negativos!', 'error');
+                return;
+            }
+        }
+
+        takeSnapshot();
+
+        // Travar originalOrder na primeira rodada (se ainda vazio)
+        if (originalOrder.length === 0) {
+            originalOrder = players.filter(p => !p.eliminated).map(p => p.id);
+        }
+
         const roundData = {};
-        let hasValidInput = false;
 
         players.forEach(p => {
             if (!p.eliminated) {
-                const input = document.querySelector(`[data-player-id="${p.id}"]`);
+                const input = document.querySelector(`#round-inputs [data-player-id="${p.id}"]`);
                 if (input) {
                     const lost = parseInt(input.value) || 0;
-                    if (lost < 0) {
-                        showToast('Valores não podem ser negativos!', 'error');
-                        return;
-                    }
                     roundData[p.id] = lost;
                     p.score -= lost;
-                    if (lost > 0) hasValidInput = true;
+
+                    // Métricas automáticas
+                    if (lost === 0) {
+                        p.roundsWon++;
+                    }
+                    if (lost > p.biggestLoss) {
+                        p.biggestLoss = lost;
+                    }
                 }
             }
         });
@@ -294,6 +450,11 @@ const App = (() => {
             scores: { ...roundData },
             playerNames: Object.fromEntries(players.map(p => [p.id, p.name])),
         });
+
+        // Avançar dealer (pula a primeira rodada pois dealer começa na posição 0)
+        if (currentRound > 1) {
+            advanceDealer();
+        }
 
         modalEndRound.close();
         saveState();
@@ -309,32 +470,183 @@ const App = (() => {
             if (!player.eliminated && player.score < 0) {
                 const survivors = players.filter(p => p.score >= 0 && !p.eliminated).length;
 
-                if (survivors >= 1) {
+                // Reentrada só é permitida se houver >= 2 sobreviventes
+                if (survivors >= 2) {
+                    const rebuyMsg = isAmistoso()
+                        ? `Pontuação: ${player.score}. Deseja voltar ao jogo?`
+                        : `Pontuação: ${player.score}. Deseja pagar a volta (R$ ${config.rebuy.toFixed(2)})?`;
+
                     const confirmed = await showConfirm(
                         `${player.name} ESTOUROU!`,
-                        `Pontuação: ${player.score}. Deseja pagar a volta (R$ ${config.rebuy.toFixed(2)})?`
+                        rebuyMsg
                     );
 
                     if (confirmed) {
-                        const targetScore = players
-                            .filter(p => p.score >= 0 && p.id !== player.id && !p.eliminated)
-                            .map(p => p.score)
-                            .reduce((min, cur) => Math.min(min, cur), 99);
-
+                        takeSnapshot();
+                        const targetScore = getLowestPositiveScore();
                         player.score = targetScore;
                         player.debt += config.rebuy;
                         player.hasPaid = false;
-                        showToast(`${player.name} pagou a volta e voltou com ${targetScore} pontos!`, 'info');
+                        showToast(`${player.name} voltou com ${targetScore} pontos!`, 'info');
                     } else {
+                        takeSnapshot();
                         player.eliminated = true;
                         showToast(`${player.name} foi eliminado!`, 'error');
                     }
                 } else {
+                    // Reentrada proibida: <= 1 sobrevivente
                     player.eliminated = true;
-                    showToast(`${player.name} foi eliminado!`, 'error');
+                    showToast(`${player.name} foi eliminado! Reentrada proibida.`, 'error');
                 }
             }
         }
+        saveState();
+        renderGame();
+    }
+
+    // =============================================
+    // DRAG AND DROP (Ordem da Mesa - Rodada 1)
+    // =============================================
+
+    function setupDragAndDrop() {
+        let dragSrcId = null;
+
+        // --- Desktop: HTML5 Drag and Drop ---
+        playersListEl.addEventListener('dragstart', (e) => {
+            if (currentRound > 0) return;
+            const card = e.target.closest('.player-card[draggable="true"]');
+            if (!card) return;
+            dragSrcId = parseInt(card.dataset.playerId);
+            card.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', String(dragSrcId));
+        });
+
+        playersListEl.addEventListener('dragover', (e) => {
+            if (currentRound > 0) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            const card = e.target.closest('.player-card');
+            if (card && parseInt(card.dataset.playerId) !== dragSrcId) {
+                card.classList.add('ring-2', 'ring-yellow-400');
+            }
+        });
+
+        playersListEl.addEventListener('dragleave', (e) => {
+            const card = e.target.closest('.player-card');
+            if (card) {
+                card.classList.remove('ring-2', 'ring-yellow-400');
+            }
+        });
+
+        playersListEl.addEventListener('drop', (e) => {
+            if (currentRound > 0) return;
+            e.preventDefault();
+            const card = e.target.closest('.player-card');
+            if (!card) return;
+            card.classList.remove('ring-2', 'ring-yellow-400');
+
+            const targetId = parseInt(card.dataset.playerId);
+            if (dragSrcId === targetId) return;
+
+            reorderPlayer(dragSrcId, targetId);
+        });
+
+        playersListEl.addEventListener('dragend', (e) => {
+            playersListEl.querySelectorAll('.player-card').forEach(c => {
+                c.classList.remove('dragging', 'ring-2', 'ring-yellow-400');
+            });
+            dragSrcId = null;
+        });
+
+        // --- Mobile: Touch Drag and Drop ---
+        let touchSrcId = null;
+        let touchClone = null;
+        let touchOffsetY = 0;
+
+        playersListEl.addEventListener('touchstart', (e) => {
+            if (currentRound > 0) return;
+            const handle = e.target.closest('.drag-handle');
+            if (!handle) return;
+
+            const card = handle.closest('.player-card');
+            if (!card) return;
+
+            touchSrcId = parseInt(card.dataset.playerId);
+            const touch = e.touches[0];
+            const rect = card.getBoundingClientRect();
+            touchOffsetY = touch.clientY - rect.top;
+
+            touchClone = card.cloneNode(true);
+            touchClone.style.position = 'fixed';
+            touchClone.style.left = rect.left + 'px';
+            touchClone.style.top = rect.top + 'px';
+            touchClone.style.width = rect.width + 'px';
+            touchClone.style.zIndex = '1000';
+            touchClone.style.opacity = '0.85';
+            touchClone.style.boxShadow = '0 8px 25px rgba(0,0,0,0.3)';
+            touchClone.style.pointerEvents = 'none';
+            touchClone.style.transition = 'none';
+            document.body.appendChild(touchClone);
+
+            card.classList.add('dragging');
+            e.preventDefault();
+        }, { passive: false });
+
+        playersListEl.addEventListener('touchmove', (e) => {
+            if (!touchClone || touchSrcId === null) return;
+
+            const touch = e.touches[0];
+            touchClone.style.top = (touch.clientY - touchOffsetY) + 'px';
+
+            // Highlight card under finger
+            const cards = [...playersListEl.querySelectorAll('.player-card')];
+            cards.forEach(c => c.classList.remove('ring-2', 'ring-yellow-400'));
+            const cardUnder = cards.find(c => {
+                if (parseInt(c.dataset.playerId) === touchSrcId) return false;
+                const rect = c.getBoundingClientRect();
+                return touch.clientY > rect.top && touch.clientY < rect.bottom;
+            });
+            if (cardUnder) {
+                cardUnder.classList.add('ring-2', 'ring-yellow-400');
+            }
+            e.preventDefault();
+        }, { passive: false });
+
+        playersListEl.addEventListener('touchend', () => {
+            if (touchSrcId === null) return;
+
+            const highlighted = playersListEl.querySelector('.player-card.ring-yellow-400');
+            if (highlighted) {
+                const targetId = parseInt(highlighted.dataset.playerId);
+                reorderPlayer(touchSrcId, targetId);
+            }
+
+            // Cleanup
+            playersListEl.querySelectorAll('.player-card').forEach(c => {
+                c.classList.remove('dragging', 'ring-2', 'ring-yellow-400');
+            });
+
+            if (touchClone) {
+                touchClone.remove();
+                touchClone = null;
+            }
+
+            touchSrcId = null;
+            renderGame();
+        });
+    }
+
+    /** Move um jogador da posição de srcId para a posição de targetId */
+    function reorderPlayer(srcId, targetId) {
+        const srcIndex = players.findIndex(p => p.id === srcId);
+        const targetIndex = players.findIndex(p => p.id === targetId);
+        if (srcIndex === -1 || targetIndex === -1) return;
+
+        const [moved] = players.splice(srcIndex, 1);
+        players.splice(targetIndex, 0, moved);
+
+        originalOrder = players.map(p => p.id);
         saveState();
         renderGame();
     }
@@ -363,7 +675,9 @@ const App = (() => {
                     html += `
                         <div class="flex justify-between gap-2 text-sm py-1 border-b border-gray-100 last:border-0">
                             <span class="text-gray-700 truncate min-w-0">${name}</span>
-                            <span class="font-mono shrink-0 ${lost > 0 ? 'text-red-500' : 'text-gray-400'}">-${lost}</span>
+                            <span class="font-mono shrink-0 ${lost > 0 ? 'text-red-500' : 'text-green-600 font-bold'}">
+                                ${lost === 0 ? '🏆 0' : '-' + lost}
+                            </span>
                         </div>`;
                 });
                 html += '</div>';
@@ -379,39 +693,78 @@ const App = (() => {
     // =============================================
 
     function renderGame() {
-        // Pote
-        const totalPot = players.reduce((sum, p) => sum + p.debt, 0);
-        totalPotEl.textContent = totalPot.toFixed(2);
+        const amistoso = isAmistoso();
 
-        // Contador de rodadas
+        // --- Pote (oculto no modo amistoso) ---
+        if (amistoso) {
+            potContainer.classList.add('hidden');
+        } else {
+            potContainer.classList.remove('hidden');
+            const totalPot = players.reduce((sum, p) => sum + p.debt, 0);
+            totalPotEl.textContent = totalPot.toFixed(2);
+        }
+
+        // --- Botão Undo ---
+        btnUndo.classList.toggle('hidden', !undoSnapshot);
+
+        // --- Contador de rodadas ---
         if (currentRound > 0) {
             roundCounterEl.textContent = `Rodada ${currentRound}`;
         } else {
             roundCounterEl.textContent = '';
         }
 
-        // Ordenar: ativos por score desc, depois eliminados
-        const sorted = [...players].sort((a, b) => {
-            if (a.eliminated !== b.eliminated) return a.eliminated ? 1 : -1;
-            return b.score - a.score;
-        });
+        // --- Ordenação ---
+        // Antes da Rodada 1: ordem do drag-and-drop (original)
+        // A partir da Rodada 1: ordenado por pontuação (maior → menor)
+        let sorted;
+        if (currentRound === 0) {
+            sorted = [...players];
+        } else {
+            sorted = [...players].sort((a, b) => {
+                if (a.eliminated !== b.eliminated) return a.eliminated ? 1 : -1;
+                return b.score - a.score;
+            });
+        }
 
-        // Checar vencedor
+        // --- Checar vencedor ---
         const activePlayers = players.filter(p => !p.eliminated);
         const hasWinner = activePlayers.length === 1 && players.length > 1 && players.filter(p => p.eliminated).length > 0;
 
         if (hasWinner) {
+            const winner = activePlayers[0];
+            const totalPot = players.reduce((sum, p) => sum + p.debt, 0);
+            const netProfit = totalPot - winner.debt;
+
             winnerBanner.classList.remove('hidden');
-            winnerNameEl.textContent = activePlayers[0].name;
+            winnerNameEl.textContent = winner.name;
+
+            if (!amistoso) {
+                winnerProfitEl.classList.remove('hidden');
+                winnerProfitEl.textContent = `Lucro Líquido: R$ ${netProfit.toFixed(2)}`;
+            } else {
+                winnerProfitEl.classList.add('hidden');
+            }
         } else {
             winnerBanner.classList.add('hidden');
         }
 
-        // Lista de jogadores
-        const list = playersListEl;
+        // --- Dealer ---
+        const dealerId = getCurrentDealerId();
+        const isDragPhase = currentRound === 0;
 
+        // Layout: coluna única na fase de arraste, grid após
+        if (isDragPhase) {
+            playersListEl.classList.remove('md:grid-cols-2', 'lg:grid-cols-3');
+            playersListEl.classList.add('max-w-lg', 'mx-auto');
+        } else {
+            playersListEl.classList.add('md:grid-cols-2', 'lg:grid-cols-3');
+            playersListEl.classList.remove('max-w-lg', 'mx-auto');
+        }
+
+        // --- Lista de jogadores ---
         if (sorted.length === 0) {
-            list.innerHTML = `
+            playersListEl.innerHTML = `
                 <div class="col-span-full text-center text-white opacity-70 mt-16 animate-fade-in">
                     <i class="fa-solid fa-users text-6xl mb-4 block" aria-hidden="true"></i>
                     <p class="text-xl">Adicione jogadores para começar!</p>
@@ -419,38 +772,118 @@ const App = (() => {
                 </div>`;
         } else {
             let html = '';
+
+            // Instrução de arraste (antes da primeira rodada)
+            if (isDragPhase && sorted.length > 1) {
+                html += `<div class="col-span-full text-center text-green-200 text-sm mb-2 animate-fade-in">
+                    <i class="fa-solid fa-arrows-up-down mr-1" aria-hidden="true"></i>
+                    Arraste para organizar a ordem da mesa
+                </div>`;
+            }
+
             sorted.forEach((p, index) => {
                 const isWinner = hasWinner && !p.eliminated;
-                const cardColor = p.eliminated ? 'bg-gray-400' : isWinner ? 'bg-yellow-100 ring-2 ring-yellow-400' : 'bg-white';
+                const isDealer = p.id === dealerId && !p.eliminated && currentRound > 0;
+                const cardColor = p.eliminated
+                    ? 'bg-gray-400'
+                    : isWinner
+                        ? 'bg-yellow-100 ring-2 ring-yellow-400'
+                        : 'bg-white';
                 const scoreColor = p.score < 0 ? 'bg-red-500 text-white' : 'bg-green-100 text-green-800';
-                const moneyIcon = p.hasPaid ? 'text-green-600 fa-circle-check' : 'text-red-500 fa-sack-dollar';
-                const moneyText = p.hasPaid ? 'Pago' : `Deve R$ ${p.debt.toFixed(2)}`;
                 const textColor = p.eliminated ? 'line-through text-gray-600' : 'text-gray-800';
                 const safeName = escapeHtml(p.name);
 
-                html += `
-                <div class="player-card ${cardColor} rounded-2xl shadow-md p-4 flex items-center gap-3 animate-slide-up" style="animation-delay: ${index * 0.05}s">
-                    <div class="shrink-0 w-12 h-12 rounded-full flex items-center justify-center font-bold text-base ${p.eliminated ? 'bg-black text-white' : isWinner ? 'bg-yellow-400 text-yellow-900' : scoreColor}">
-                        ${p.eliminated ? '<i class="fa-solid fa-skull" aria-hidden="true"></i>' : isWinner ? '<i class="fa-solid fa-crown" aria-hidden="true"></i>' : p.score}
-                    </div>
-                    <div class="min-w-0 flex-1">
-                        <div class="font-bold ${textColor} text-base truncate">${safeName}</div>
-                        ${!p.eliminated && p.debt > 0 ? `<div class="text-sm text-gray-500 truncate">${moneyText}</div>` : ''}
-                        ${isWinner ? '<div class="text-sm text-yellow-600 font-bold">Vencedor!</div>' : ''}
-                    </div>
-                    ${!p.eliminated ? `
+                // Conteúdo do círculo de score
+                let circleContent;
+                let circleColor;
+                if (p.eliminated) {
+                    circleContent = '<i class="fa-solid fa-skull" aria-hidden="true"></i>';
+                    circleColor = 'bg-black text-white';
+                } else if (isWinner) {
+                    circleContent = '<i class="fa-solid fa-crown" aria-hidden="true"></i>';
+                    circleColor = 'bg-yellow-400 text-yellow-900';
+                } else {
+                    circleContent = p.score;
+                    circleColor = scoreColor;
+                }
+
+                // Métricas automáticas
+                let metricsHtml = '';
+                if (!p.eliminated && currentRound > 0) {
+                    const parts = [];
+                    if (p.roundsWon > 0) parts.push(`🏆 ${p.roundsWon}`);
+                    if (p.biggestLoss > 0) parts.push(`📉 ${p.biggestLoss}`);
+                    if (parts.length > 0) {
+                        metricsHtml = `<div class="text-xs text-gray-400 mt-0.5">${parts.join(' &nbsp; ')}</div>`;
+                    }
+                }
+
+                // Dívida (oculta no modo amistoso)
+                let debtHtml = '';
+                if (!amistoso && !p.eliminated && p.debt > 0) {
+                    const moneyText = p.hasPaid ? 'Pago' : `Deve R$ ${p.debt.toFixed(2)}`;
+                    debtHtml = `<div class="text-sm text-gray-500 truncate">${moneyText}</div>`;
+                }
+
+                // Info do vencedor
+                let winnerInfo = '';
+                if (isWinner && !amistoso) {
+                    const totalPot = players.reduce((sum, pl) => sum + pl.debt, 0);
+                    const netProfit = totalPot - p.debt;
+                    winnerInfo = `<div class="text-sm text-yellow-600 font-bold">Vencedor! Lucro: R$ ${netProfit.toFixed(2)}</div>`;
+                } else if (isWinner) {
+                    winnerInfo = '<div class="text-sm text-yellow-600 font-bold">Vencedor!</div>';
+                }
+
+                // Badge do dealer
+                let dealerBadge = '';
+                if (isDealer) {
+                    dealerBadge = '<span class="dealer-badge" title="Dealer">🃏</span>';
+                }
+
+                // Handle de arraste (apenas antes da primeira rodada)
+                let dragHandle = '';
+                if (isDragPhase && !p.eliminated) {
+                    dragHandle = `<div class="drag-handle shrink-0 cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 px-1">
+                        <i class="fa-solid fa-grip-vertical text-lg" aria-hidden="true"></i>
+                    </div>`;
+                }
+
+                // Botão de pagamento (oculto no modo amistoso)
+                let paymentBtn = '';
+                if (!p.eliminated && !amistoso && p.debt > 0) {
+                    const moneyIcon = p.hasPaid ? 'text-green-600 fa-circle-check' : 'text-red-500 fa-sack-dollar';
+                    paymentBtn = `
                     <button type="button" data-toggle-payment="${p.id}"
                         class="shrink-0 text-3xl active:scale-90 transition-all focus:ring-2 focus:ring-green-300 focus:outline-none rounded-full min-h-[48px] min-w-[48px] flex items-center justify-center"
                         aria-label="${p.hasPaid ? 'Desmarcar pagamento de ' + safeName : 'Marcar pagamento de ' + safeName}">
                         <i class="fa-solid ${moneyIcon}" aria-hidden="true"></i>
-                    </button>
-                    ` : ''}
+                    </button>`;
+                }
+
+                html += `
+                <div class="player-card ${cardColor} rounded-2xl shadow-md p-4 flex items-center gap-3 animate-slide-up relative"
+                    style="animation-delay: ${index * 0.05}s"
+                    data-player-id="${p.id}"
+                    ${isDragPhase && !p.eliminated ? 'draggable="true"' : ''}>
+                    ${dealerBadge}
+                    ${dragHandle}
+                    <div class="shrink-0 w-12 h-12 rounded-full flex items-center justify-center font-bold text-base ${circleColor}">
+                        ${circleContent}
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <div class="font-bold ${textColor} text-base truncate">${safeName}</div>
+                        ${debtHtml}
+                        ${metricsHtml}
+                        ${winnerInfo}
+                    </div>
+                    ${paymentBtn}
                 </div>`;
             });
-            list.innerHTML = html;
+            playersListEl.innerHTML = html;
         }
 
-        // Controla botão de fechar rodada
+        // --- Controle do botão de fechar rodada ---
         const activeCount = activePlayers.length;
         btnEndRound.disabled = activeCount < 2;
 
@@ -467,15 +900,23 @@ const App = (() => {
     // =============================================
 
     function init() {
-        // Tela de setup
-        $('btn-start-game').addEventListener('click', startGame);
+        // Tela de setup - seleção de modo
+        $('btn-mode-amistoso').addEventListener('click', startAmistoso);
+        $('btn-mode-apostado').addEventListener('click', showApostadoFields);
+        $('btn-back-mode').addEventListener('click', () => {
+            apostadoFields.classList.add('hidden');
+            modeSelection.classList.remove('hidden');
+            entryFeeInput.value = '';
+            rebuyFeeInput.value = '';
+        });
+        $('btn-start-game').addEventListener('click', startApostado);
 
-        // Enter nos inputs de setup
+        // Enter nos inputs de setup (modo apostado)
         entryFeeInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') rebuyFeeInput.focus();
         });
         rebuyFeeInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') startGame();
+            if (e.key === 'Enter') startApostado();
         });
 
         // Header do jogo
@@ -486,6 +927,9 @@ const App = (() => {
             setTimeout(() => newPlayerNameInput.focus(), 100);
         });
         $('btn-history').addEventListener('click', openHistory);
+        $('btn-help').addEventListener('click', () => modalHelp.showModal());
+        $('btn-close-help').addEventListener('click', () => modalHelp.close());
+        btnUndo.addEventListener('click', undo);
 
         // Modal adicionar jogador
         $('btn-confirm-add').addEventListener('click', confirmAddPlayer);
@@ -510,6 +954,9 @@ const App = (() => {
                 togglePayment(id);
             }
         });
+
+        // Drag and drop (ordem da mesa)
+        setupDragAndDrop();
 
         // Prevenir perda acidental
         window.addEventListener('beforeunload', (e) => {
