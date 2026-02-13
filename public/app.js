@@ -15,6 +15,7 @@ const App = (() => {
     let originalOrder = [];     // Ordem física da mesa (IDs dos jogadores)
     let dealerIndex = 0;        // Índice em originalOrder para o dealer atual
     let undoSnapshot = null;    // Último snapshot para desfazer
+    let confettiShown = false;  // Flag para não repetir confetti
 
     // --- REFERÊNCIAS DOM ---
     const $ = (id) => document.getElementById(id);
@@ -26,6 +27,8 @@ const App = (() => {
     const rebuyFeeInput = $('rebuy-fee');
     const totalPotEl = $('total-pot');
     const potContainer = $('pot-container');
+    const modeBadge = $('mode-badge');
+    const btnAddPlayer = $('btn-add-player');
     const playersListEl = $('players-list');
     const btnEndRound = $('btn-end-round');
     const newPlayerNameInput = $('new-player-name');
@@ -253,6 +256,7 @@ const App = (() => {
         originalOrder = [];
         dealerIndex = 0;
         undoSnapshot = null;
+        confettiShown = false;
 
         clearState();
 
@@ -348,6 +352,49 @@ const App = (() => {
     }
 
     // =============================================
+    // HELPERS UX
+    // =============================================
+
+    /** Retorna classes Tailwind para o círculo de score baseado na faixa */
+    function getScoreZoneColor(score) {
+        if (score >= 50) return 'bg-green-100 text-green-800';
+        if (score >= 20) return 'bg-yellow-100 text-yellow-800';
+        if (score >= 1) return 'bg-orange-100 text-orange-800';
+        return 'bg-gray-200 text-gray-600';
+    }
+
+    /** Retorna os pontos perdidos por um jogador na última rodada, ou null */
+    function getLastRoundLoss(playerId) {
+        if (roundHistory.length === 0) return null;
+        const last = roundHistory[roundHistory.length - 1];
+        return last.scores[playerId] ?? null;
+    }
+
+    /** Efeito de confetti para celebrar o vencedor */
+    function triggerConfetti() {
+        const container = document.createElement('div');
+        container.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:200;overflow:hidden;';
+
+        const colors = ['#f59e0b', '#10b981', '#3b82f6', '#ef4444', '#8b5cf6', '#ec4899'];
+        for (let i = 0; i < 60; i++) {
+            const piece = document.createElement('div');
+            const size = Math.random() * 8 + 4;
+            piece.style.cssText = `
+                position:absolute;
+                width:${size}px;height:${size}px;
+                background:${colors[Math.floor(Math.random() * colors.length)]};
+                left:${Math.random() * 100}%;top:-10px;
+                border-radius:${Math.random() > 0.5 ? '50%' : '2px'};
+                animation:confettiFall ${Math.random() * 2 + 2}s linear forwards;
+                animation-delay:${Math.random() * 0.8}s;
+            `;
+            container.appendChild(piece);
+        }
+        document.body.appendChild(container);
+        setTimeout(() => container.remove(), 5000);
+    }
+
+    // =============================================
     // DEALER (Distribuidor)
     // =============================================
 
@@ -387,25 +434,66 @@ const App = (() => {
         activePlayers.forEach(p => {
             const safeName = escapeHtml(p.name);
             const isDealer = p.id === dealerId && currentRound > 0;
+            const zoneColor = p.score >= 50 ? 'text-green-600' : p.score >= 20 ? 'text-yellow-600' : 'text-orange-600';
             html += `
-                <div class="flex items-center gap-3 bg-gray-50 p-4 rounded-xl">
-                    <span class="font-bold text-gray-700 text-base truncate min-w-0 flex-1">
-                        ${isDealer ? '🃏 ' : ''}${safeName}
-                    </span>
-                    <input type="number" data-player-id="${p.id}" min="0"
-                        class="round-score-input shrink-0 w-24 border-2 border-gray-200 rounded-lg p-3 text-center text-lg focus:border-green-500 focus:ring-2 focus:ring-green-300 focus:outline-none min-h-[48px]"
+                <div class="flex items-center gap-2 bg-gray-50 p-3 rounded-xl">
+                    <div class="min-w-0 flex-1">
+                        <div class="font-bold text-gray-700 text-sm truncate">${isDealer ? '🃏 ' : ''}${safeName}</div>
+                        <div class="text-xs ${zoneColor} font-medium">Atual: ${p.score}</div>
+                    </div>
+                    <input type="number" data-player-id="${p.id}" data-current-score="${p.score}" min="0"
+                        class="round-score-input shrink-0 w-20 border-2 border-gray-200 rounded-lg p-2.5 text-center text-lg focus:border-green-500 focus:ring-2 focus:ring-green-300 focus:outline-none min-h-[44px]"
                         placeholder="0" inputmode="numeric">
+                    <div class="shrink-0 w-14 text-center">
+                        <div class="text-[10px] text-gray-400 leading-none mb-0.5">Novo</div>
+                        <div class="font-bold text-sm text-gray-600 preview-score" data-preview-for="${p.id}">${p.score}</div>
+                    </div>
                 </div>
             `;
         });
         container.innerHTML = html;
         modalEndRound.showModal();
 
-        const firstInput = container.querySelector('input');
-        if (firstInput) firstInput.focus();
+        // Live preview + Enter navigation
+        const inputs = [...container.querySelectorAll('input')];
+        inputs.forEach((input, i) => {
+            // Preview em tempo real
+            input.addEventListener('input', () => {
+                const lost = parseInt(input.value) || 0;
+                const current = parseInt(input.dataset.currentScore);
+                const newScore = current - lost;
+                const previewEl = container.querySelector(`[data-preview-for="${input.dataset.playerId}"]`);
+                if (previewEl) {
+                    previewEl.textContent = newScore;
+                    if (newScore < 0) {
+                        previewEl.className = 'font-bold text-sm text-red-500 bust-preview';
+                        previewEl.textContent = newScore + ' 💥';
+                    } else if (newScore <= 10) {
+                        previewEl.className = 'font-bold text-sm text-orange-500';
+                    } else {
+                        previewEl.className = 'font-bold text-sm text-green-600';
+                    }
+                }
+            });
+
+            // Enter → próximo input ou processar
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (i < inputs.length - 1) {
+                        inputs[i + 1].focus();
+                        inputs[i + 1].select();
+                    } else {
+                        processRound();
+                    }
+                }
+            });
+        });
+
+        if (inputs[0]) inputs[0].focus();
     }
 
-    function processRound() {
+    async function processRound() {
         // Validação: impedir valores negativos
         const inputs = document.querySelectorAll('#round-inputs [data-player-id]');
         for (const input of inputs) {
@@ -414,6 +502,16 @@ const App = (() => {
                 showToast('Valores não podem ser negativos!', 'error');
                 return;
             }
+        }
+
+        // Aviso: todos os inputs são 0
+        const allZero = [...inputs].every(input => (parseInt(input.value) || 0) === 0);
+        if (allZero) {
+            const proceed = await showConfirm(
+                'Tudo zero?',
+                'Todos os valores estão zerados. Tem certeza que deseja processar esta rodada?'
+            );
+            if (!proceed) return;
         }
 
         takeSnapshot();
@@ -468,6 +566,9 @@ const App = (() => {
     async function checkEstouros() {
         for (const player of players) {
             if (!player.eliminated && player.score < 0) {
+                // Feedback tátil no mobile
+                navigator.vibrate?.(200);
+
                 const survivors = players.filter(p => p.score >= 0 && !p.eliminated).length;
 
                 // Reentrada só é permitida se houver >= 2 sobreviventes
@@ -704,12 +805,23 @@ const App = (() => {
             totalPotEl.textContent = totalPot.toFixed(2);
         }
 
+        // --- Mode badge (Amistoso) ---
+        if (amistoso) {
+            modeBadge.classList.remove('hidden');
+        } else {
+            modeBadge.classList.add('hidden');
+        }
+
         // --- Botão Undo ---
         btnUndo.classList.toggle('hidden', !undoSnapshot);
 
-        // --- Contador de rodadas ---
+        // --- Contador de rodadas + jogadores ativos ---
         if (currentRound > 0) {
-            roundCounterEl.textContent = `Rodada ${currentRound}`;
+            const totalPlayers = players.length;
+            const activeCount2 = players.filter(p => !p.eliminated).length;
+            roundCounterEl.textContent = `Rodada ${currentRound} · ${activeCount2}/${totalPlayers} jogadores`;
+        } else if (players.length > 0) {
+            roundCounterEl.textContent = `${players.length} jogador${players.length !== 1 ? 'es' : ''}`;
         } else {
             roundCounterEl.textContent = '';
         }
@@ -745,8 +857,20 @@ const App = (() => {
             } else {
                 winnerProfitEl.classList.add('hidden');
             }
+
+            // Confetti (dispara apenas uma vez)
+            if (!confettiShown) {
+                confettiShown = true;
+                triggerConfetti();
+            }
+
+            // Desabilitar botão de adicionar jogador
+            btnAddPlayer.disabled = true;
+            btnAddPlayer.classList.add('opacity-50', 'pointer-events-none');
         } else {
             winnerBanner.classList.add('hidden');
+            btnAddPlayer.disabled = false;
+            btnAddPlayer.classList.remove('opacity-50', 'pointer-events-none');
         }
 
         // --- Dealer ---
@@ -789,7 +913,7 @@ const App = (() => {
                     : isWinner
                         ? 'bg-yellow-100 ring-2 ring-yellow-400'
                         : 'bg-white';
-                const scoreColor = p.score < 0 ? 'bg-red-500 text-white' : 'bg-green-100 text-green-800';
+                const scoreColor = p.score < 0 ? 'bg-red-500 text-white' : getScoreZoneColor(p.score);
                 const textColor = p.eliminated ? 'line-through text-gray-600' : 'text-gray-800';
                 const safeName = escapeHtml(p.name);
 
@@ -805,6 +929,24 @@ const App = (() => {
                 } else {
                     circleContent = p.score;
                     circleColor = scoreColor;
+                }
+
+                // Posição no ranking
+                let positionBadge = '';
+                if (currentRound > 0 && !p.eliminated) {
+                    const pos = index + 1;
+                    positionBadge = `<span class="text-xs text-gray-400 font-medium">#${pos}</span> `;
+                }
+
+                // Delta da última rodada
+                let deltaHtml = '';
+                if (currentRound > 0 && !p.eliminated) {
+                    const lastLoss = getLastRoundLoss(p.id);
+                    if (lastLoss !== null && lastLoss > 0) {
+                        deltaHtml = `<span class="ml-1.5 text-xs text-red-400 font-medium">▼${lastLoss}</span>`;
+                    } else if (lastLoss === 0) {
+                        deltaHtml = `<span class="ml-1.5 text-xs text-green-500 font-medium">★</span>`;
+                    }
                 }
 
                 // Métricas automáticas
@@ -872,7 +1014,7 @@ const App = (() => {
                         ${circleContent}
                     </div>
                     <div class="min-w-0 flex-1">
-                        <div class="font-bold ${textColor} text-base truncate">${safeName}</div>
+                        <div class="font-bold ${textColor} text-base truncate">${positionBadge}${safeName}${deltaHtml}</div>
                         ${debtHtml}
                         ${metricsHtml}
                         ${winnerInfo}
@@ -930,6 +1072,7 @@ const App = (() => {
         $('btn-help').addEventListener('click', () => modalHelp.showModal());
         $('btn-close-help').addEventListener('click', () => modalHelp.close());
         btnUndo.addEventListener('click', undo);
+        $('btn-restart-game').addEventListener('click', newGame);
 
         // Modal adicionar jogador
         $('btn-confirm-add').addEventListener('click', confirmAddPlayer);

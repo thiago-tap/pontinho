@@ -130,6 +130,9 @@
                     <div id="pot-container" class="text-white font-bold text-xl">
                         Pote: R$ <span id="total-pot">0.00</span>
                     </div>
+                    <div id="mode-badge" class="hidden text-green-300 text-sm font-medium flex items-center gap-1">
+                        <i class="fa-solid fa-handshake" aria-hidden="true"></i> Amistoso
+                    </div>
                 </div>
                 <div class="flex items-center gap-2">
                     <button type="button" id="btn-help" aria-label="Como jogar"
@@ -153,6 +156,11 @@
                 <span id="winner-name"></span> VENCEU!
                 <i class="fa-solid fa-trophy ml-2" aria-hidden="true"></i>
                 <div id="winner-profit" class="hidden text-base font-semibold mt-1"></div>
+                <button type="button" id="btn-restart-game"
+                    class="mt-2 px-5 py-2 bg-green-700 text-white text-sm font-bold rounded-full hover:bg-green-600 active:scale-95 transition-all focus:ring-2 focus:ring-green-300 focus:outline-none min-h-[40px] shadow">
+                    <i class="fa-solid fa-arrows-rotate mr-1" aria-hidden="true"></i>
+                    Nova Mesa
+                </button>
             </div>
 
             <div id="players-list" class="flex-grow overflow-y-auto p-3 md:p-6 pb-28 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 content-start">
@@ -179,8 +187,8 @@
                 placeholder="Nome do jogador" maxlength="20" autocomplete="off">
             <div class="flex justify-end gap-2">
                 <button type="button" id="btn-cancel-add"
-                    class="px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-all focus:ring-2 focus:ring-gray-300 focus:outline-none min-h-[44px]">
-                    Cancelar
+                    class="px-4 py-2 bg-red-500 text-white rounded font-bold hover:bg-red-600 active:scale-95 transition-all focus:ring-2 focus:ring-red-300 focus:outline-none min-h-[44px]">
+                    Finalizar
                 </button>
                 <button type="button" id="btn-confirm-add"
                     class="px-4 py-2 bg-green-600 text-white rounded font-bold hover:bg-green-700 active:scale-95 transition-all focus:ring-2 focus:ring-green-300 focus:outline-none min-h-[44px]">

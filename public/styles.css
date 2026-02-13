@@ -107,6 +107,24 @@ input[type="number"]::-webkit-outer-spin-button {
     z-index: 2;
 }
 
+/* --- Confetti --- */
+@keyframes confettiFall {
+    0% {
+        transform: translateY(0) rotate(0deg) scale(1);
+        opacity: 1;
+    }
+
+    100% {
+        transform: translateY(100vh) rotate(720deg) scale(0.5);
+        opacity: 0;
+    }
+}
+
+/* --- Preview de estouro no modal --- */
+.bust-preview {
+    animation: pulseOnce 0.3s ease-in-out;
+}
+
 /* --- Scrollbar sutil na lista de jogadores --- */
 #players-list::-webkit-scrollbar {
     width: 4px;
