@@ -45,6 +45,7 @@ const App = (() => {
   const modalConfirm = $("modal-confirm");
   const modalHistory = $("modal-history");
   const modalHelp = $("modal-help");
+  const modalSettlement = $("modal-settlement");
 
   // =============================================
   // UTILITÁRIOS
@@ -441,6 +442,18 @@ const App = (() => {
 
   /** Retorna o ID do jogador que é o dealer atual */
   function getCurrentDealerId() {
+    // Rodada 0: dealer preview (o primeiro da lista será o dealer)
+    if (currentRound === 0) {
+      if (originalOrder.length === 0) {
+        // Ainda não foi iniciado: mostrar o primeiro jogador ativo
+        const firstActive = players.find((p) => !p.eliminated);
+        return firstActive?.id || null;
+      }
+      // originalOrder foi congelada: mostrar o primeiro daquela ordem
+      return originalOrder[0] || null;
+    }
+
+    // Rodada 1+: dealer atual
     if (originalOrder.length === 0) return null;
     if (dealerIndex >= originalOrder.length) dealerIndex = 0;
     return originalOrder[dealerIndex];
@@ -474,7 +487,7 @@ const App = (() => {
     let html = "";
     activePlayers.forEach((p) => {
       const safeName = escapeHtml(p.name);
-      const isDealer = p.id === dealerId && currentRound > 0;
+      const isDealer = p.id === dealerId;
       const zoneColor =
         p.score >= 50
           ? "text-green-600"
@@ -484,7 +497,7 @@ const App = (() => {
       html += `
                 <div class="flex items-center gap-2 bg-gray-50 p-3 rounded-xl">
                     <div class="min-w-0 flex-1">
-                        <div class="font-bold text-gray-700 text-sm truncate">${isDealer ? "🃏 " : ""}${safeName}</div>
+                        <div class="font-bold text-gray-700 text-sm truncate">${isDealer ? '<span style="color: #f59e0b; font-weight: bold;">🃏 DEALER:</span> ' : ""}${safeName}</div>
                         <div class="text-xs ${zoneColor} font-medium">Atual: ${p.score}</div>
                     </div>
                     <input type="number" data-player-id="${p.id}" data-current-score="${p.score}" min="0"
@@ -539,6 +552,33 @@ const App = (() => {
     });
 
     if (inputs[0]) inputs[0].focus();
+  }
+
+  /** Inicia o jogo: trava ordemlista de jogadores e ativa o dealer */
+  function startGame() {
+    // Validar se há pelo menos 2 jogadores
+    const activeCount = players.filter((p) => !p.eliminated).length;
+    if (activeCount < 2) {
+      showToast("Adicione pelo menos 2 jogadores!", "warning");
+      return;
+    }
+
+    // Travar a ordem atual (se ainda não foi travada)
+    if (originalOrder.length === 0) {
+      originalOrder = players.filter((p) => !p.eliminated).map((p) => p.id);
+    }
+
+    // Incrementar para Rodada 1 (ativa o dealer e o botão "Fechar Rodada")
+    currentRound = 1;
+    dealerIndex = 0; // Reseta o dealer para o primeiro
+
+    saveState();
+    renderGame();
+    showToast(
+      "Partida iniciada! Dealer: " +
+        escapeHtml(players.find((p) => p.id === originalOrder[0])?.name || "?"),
+      "success",
+    );
   }
 
   async function processRound() {
@@ -603,15 +643,22 @@ const App = (() => {
       playerNames: Object.fromEntries(players.map((p) => [p.id, p.name])),
     });
 
-    // Avançar dealer (pula a primeira rodada pois dealer começa na posição 0)
-    if (currentRound > 1) {
+    // Processar estouros ANTES de avançar dealer
+    // Isso garante que o dealer só avance para jogadores ainda ativos
+    // Se novo dealer estourar:
+    //  - Se recusar reentrada → eliminado → dealer avança para próximo
+    //  - Se aceitar reentrada → fica no jogo → dealer fica com ele
+    await checkEstouros();
+
+    // Avançar dealer (a partir da Rodada 1)
+    // Agora sabemos quem está realmente ativo após os estouros
+    if (currentRound >= 1) {
       advanceDealer();
     }
 
     modalEndRound.close();
     saveState();
-    // checkEstouros não tira snapshot porque já foi feito acima
-    await checkEstouros();
+    renderGame(); // Renderiza com dealer atualizado
   }
 
   // =============================================
@@ -673,7 +720,7 @@ const App = (() => {
     }
 
     saveState();
-    renderGame();
+    // renderGame será chamado após advanceDealer em processRound()
   }
 
   // =============================================
@@ -871,6 +918,97 @@ const App = (() => {
   }
 
   // =============================================
+  // ACERTO DE CONTAS (Settlement)
+  // =============================================
+
+  function openSettlement() {
+    const activePlayers = players.filter((p) => !p.eliminated);
+    const winner = activePlayers[0];
+    if (!winner) return;
+
+    const losers = players.filter((p) => p.eliminated);
+    const totalPot = players.reduce((sum, p) => sum + p.debt, 0);
+    const netProfit = totalPot - winner.debt;
+
+    // Populando header
+    $("settlement-winner-name").textContent = escapeHtml(winner.name);
+    $("settlement-winner-profit").textContent =
+      `Lucro: R$ ${netProfit.toFixed(2)}`;
+    $("settlement-total-in-play").textContent = totalPot.toFixed(2);
+
+    // Populando lista de perdedores
+    const losersContainer = $("settlement-losers");
+    let losersHtml = "";
+
+    if (losers.length === 0) {
+      losersHtml = `
+                <div class="text-center text-gray-400 py-4">
+                    <p class="text-sm">Nenhum jogador elimado (modo amistoso?)</p>
+                </div>
+            `;
+    } else {
+      losers.forEach((p) => {
+        const safeName = escapeHtml(p.name);
+        const moneyIcon = p.hasPaid
+          ? "text-green-600 fa-circle-check"
+          : "text-red-500 fa-sack-dollar";
+        const statusClass = p.hasPaid
+          ? "line-through text-green-600"
+          : "text-red-600 font-semibold";
+
+        losersHtml += `
+                    <div class="flex items-center gap-3 bg-gray-50 rounded-lg p-3 border-l-4 ${p.hasPaid ? "border-green-400" : "border-red-300"}">
+                        <button type="button" data-settlement-toggle="${p.id}"
+                            class="shrink-0 text-2xl active:scale-90 transition-all focus:ring-2 focus:ring-green-300 focus:outline-none rounded-full min-h-[40px] min-w-[40px] flex items-center justify-center"
+                            aria-label="${p.hasPaid ? "Desmarcar pagamento de " + safeName : "Marcar pagamento de " + safeName}">
+                            <i class="fa-solid ${moneyIcon}" aria-hidden="true"></i>
+                        </button>
+                        <div class="min-w-0 flex-1">
+                            <div class="font-bold ${statusClass} text-sm truncate">${safeName}</div>
+                            <div class="text-xs text-gray-500">Deve: R$ ${p.debt.toFixed(2)}</div>
+                        </div>
+                        <div class="shrink-0 text-sm font-mono ${p.hasPaid ? "text-green-600" : "text-gray-600"}">
+                            ${p.hasPaid ? "✓" : "✗"}
+                        </div>
+                    </div>
+                `;
+      });
+    }
+
+    losersContainer.innerHTML = losersHtml;
+
+    // Atualizando resumo de pagamentos
+    updateSettlementSummary();
+
+    // Delegação de evento para pagamentos na settlement (cada vez que abre)
+    losersContainer.replaceWith(losersContainer.cloneNode(true));
+    const newLosersContainer = $("settlement-losers");
+    newLosersContainer.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-settlement-toggle]");
+      if (btn) {
+        const id = parseInt(btn.dataset.settlementToggle);
+        togglePayment(id);
+        openSettlement(); // Atualizar modal após marcar pagamento
+      }
+    });
+
+    modalSettlement.showModal();
+  }
+
+  function updateSettlementSummary() {
+    const losers = players.filter((p) => p.eliminated);
+    const paidAmount = losers
+      .filter((p) => p.hasPaid)
+      .reduce((sum, p) => sum + p.debt, 0);
+    const pendingAmount = losers
+      .filter((p) => !p.hasPaid)
+      .reduce((sum, p) => sum + p.debt, 0);
+
+    $("settlement-paid").textContent = `R$ ${paidAmount.toFixed(2)}`;
+    $("settlement-pending").textContent = `R$ ${pendingAmount.toFixed(2)}`;
+  }
+
+  // =============================================
   // RENDERIZAÇÃO (UI)
   // =============================================
 
@@ -946,6 +1084,12 @@ const App = (() => {
       if (!confettiShown) {
         confettiShown = true;
         triggerConfetti();
+        // Abrir modal de acerto de contas após breve delay para confetti
+        setTimeout(() => {
+          if (!amistoso) {
+            openSettlement();
+          }
+        }, 300);
       }
 
       // Desabilitar botão de adicionar jogador
@@ -991,7 +1135,7 @@ const App = (() => {
 
       sorted.forEach((p, index) => {
         const isWinner = hasWinner && !p.eliminated;
-        const isDealer = p.id === dealerId && !p.eliminated && currentRound > 0;
+        const isDealer = p.id === dealerId && !p.eliminated;
         const cardColor = p.eliminated
           ? "bg-gray-400"
           : isWinner
@@ -1070,7 +1214,8 @@ const App = (() => {
         // Badge do dealer
         let dealerBadge = "";
         if (isDealer) {
-          dealerBadge = '<span class="dealer-badge" title="Dealer">🃏</span>';
+          const dealerLabel = currentRound === 0 ? "EMBARALHAR" : "DEALER";
+          dealerBadge = `<span class="dealer-badge" title="${dealerLabel}">🃏 ${dealerLabel}</span>`;
         }
 
         // Handle de arraste (apenas antes da primeira rodada)
@@ -1096,7 +1241,7 @@ const App = (() => {
         }
 
         html += `
-                <div class="player-card ${cardColor} rounded-2xl shadow-md p-4 flex items-center gap-3 animate-slide-up relative"
+                <div class="player-card ${cardColor} rounded-2xl shadow-md p-5 flex items-center gap-3 animate-slide-up relative min-h-[110px]"
                     style="animation-delay: ${index * 0.05}s"
                     data-player-id="${p.id}"
                     ${isDragPhase && !p.eliminated ? 'draggable="true"' : ""}>
@@ -1117,14 +1262,19 @@ const App = (() => {
       playersListEl.innerHTML = html;
     }
 
-    // --- Controle do botão de fechar rodada ---
+    // --- Controle do botão de fechar/iniciar rodada ---
     const activeCount = activePlayers.length;
-    btnEndRound.disabled = activeCount < 2;
 
     if (hasWinner) {
       btnEndRound.disabled = true;
       btnEndRound.textContent = "JOGO ENCERRADO";
+    } else if (currentRound === 0) {
+      // Rodada 0 (setup): mostrar "Iniciar Partida"
+      btnEndRound.disabled = activeCount < 2;
+      btnEndRound.textContent = "INICIAR PARTIDA";
     } else {
+      // Rodadas 1+: mostrar "Fechar Rodada"
+      btnEndRound.disabled = activeCount < 2;
       btnEndRound.textContent = "FECHAR RODADA";
     }
   }
@@ -1163,6 +1313,9 @@ const App = (() => {
     $("btn-history").addEventListener("click", openHistory);
     $("btn-help").addEventListener("click", () => modalHelp.showModal());
     $("btn-close-help").addEventListener("click", () => modalHelp.close());
+    $("btn-close-settlement").addEventListener("click", () =>
+      modalSettlement.close(),
+    );
     btnUndo.addEventListener("click", undo);
     $("btn-restart-game").addEventListener("click", newGame);
 
@@ -1174,7 +1327,15 @@ const App = (() => {
     });
 
     // Modal fim de rodada
-    btnEndRound.addEventListener("click", openEndRoundModal);
+    btnEndRound.addEventListener("click", () => {
+      // Na Rodada 0, "Iniciar Partida" inicia o jogo
+      if (currentRound === 0) {
+        startGame();
+      } else {
+        // A partir da Rodada 1, "Fechar Rodada" processa normalmente
+        openEndRoundModal();
+      }
+    });
     $("btn-process-round").addEventListener("click", processRound);
     $("btn-cancel-round").addEventListener("click", () =>
       modalEndRound.close(),
