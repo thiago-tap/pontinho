@@ -62,11 +62,104 @@ input[type="number"]::-webkit-outer-spin-button {
   opacity: 1;
 }
 
-/* --- Prevent iOS zoom on input focus --- */
+/* --- Mobile Optimization --- */
 @media screen and (max-width: 768px) {
+  /* Inputs - Melhorar legibilidade e usabilidade */
   input[type="text"],
   input[type="number"] {
-    font-size: 16px;
+    font-size: 16px !important;
+    padding: 12px 16px !important;
+    min-height: 48px !important;
+    letter-spacing: 0.5px;
+  }
+
+  /* Botões - Aumentar para touch */
+  button {
+    min-height: 48px !important;
+    min-width: 48px !important;
+    font-size: 16px !important;
+    padding: 12px 20px !important;
+  }
+
+  /* Modals - Mais espaço */
+  dialog {
+    max-width: 95vw !important;
+    width: calc(100% - 1rem) !important;
+  }
+
+  dialog > div {
+    padding: 20px !important;
+    border-radius: 16px !important;
+  }
+
+  dialog h2 {
+    font-size: 24px !important;
+    margin-bottom: 20px !important;
+  }
+
+  /* Player Cards - Espaçamento melhor */
+  .player-card {
+    padding: 16px !important;
+    margin-bottom: 12px !important;
+    gap: 12px !important;
+  }
+
+  /* Badge dealer - Não sobrepor */
+  .dealer-badge {
+    position: relative !important;
+    top: auto !important;
+    right: auto !important;
+    margin-bottom: -10px !important;
+    margin-top: -5px !important;
+    margin-left: auto !important;
+    padding: 4px 10px !important;
+    font-size: 12px !important;
+    min-width: fit-content !important;
+  }
+
+  /* Flex gaps - Mais espaçamento */
+  .flex {
+    gap: 12px !important;
+  }
+
+  /* Text - Mais legível */
+  .text-base {
+    font-size: 18px !important;
+  }
+
+  .text-sm {
+    font-size: 15px !important;
+  }
+
+  .text-lg {
+    font-size: 20px !important;
+  }
+
+  /* Botões de ação principal - Fullwidth em mobile */
+  #btn-end-round,
+  #btn-process-round,
+  #btn-restart-game {
+    width: 100% !important;
+  }
+
+  /* Espaçamento grande entre botões */
+  .flex.gap-2 {
+    gap: 12px !important;
+  }
+
+  .flex.gap-3 {
+    gap: 16px !important;
+  }
+
+  /* Labels melhor visíveis */
+  label {
+    font-size: 16px !important;
+    margin-bottom: 8px !important;
+  }
+
+  /* Setup screen - Melhor distribuição */
+  #setup-screen {
+    padding: 20px !important;
   }
 }
 
@@ -120,6 +213,47 @@ input[type="number"]::-webkit-outer-spin-button {
     transform: translateY(100vh) rotate(720deg) scale(0.5);
     opacity: 0;
   }
+}
+
+/* --- Animações de Tela (Fluidez) --- */
+@keyframes fadeInSmooth {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideOutDown {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+}
+
+section {
+  animation: fadeInSmooth 0.35s ease-out;
+  transition: opacity 0.35s ease-out;
+}
+
+dialog[open] {
+  animation: slideInUp 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 /* --- Preview de estouro no modal --- */
