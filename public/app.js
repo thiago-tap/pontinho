@@ -306,6 +306,40 @@ const App = (() => {
     showToast("Mesa encerrada!", "info");
   }
 
+  /** Reinicia a partida com os mesmos jogadores, reseta scores e rodadas */
+  async function restartPartida() {
+    const confirmed = await showConfirm(
+      "Reiniciar Partida",
+      "Tem certeza que deseja reiniciar a partida com os mesmos jogadores?",
+    );
+    if (!confirmed) return;
+
+    // Manter os jogadores e configuração, mas resetar scores e histórico
+    players.forEach((p) => {
+      p.score = 99;
+      p.eliminated = false;
+      p.roundsWon = 0;
+      p.biggestLoss = 0;
+      p.debt = config.entry;
+      p.hasPaid = false;
+    });
+
+    roundHistory = [];
+    currentRound = 0;
+    dealerIndex = 0;
+    undoSnapshot = null;
+    confettiShown = false;
+    originalOrder = [];
+
+    winnerBanner.classList.add("hidden");
+    roundCounterEl.textContent = "";
+
+    saveState();
+    renderGame();
+
+    showToast("Partida reiniciada com sucesso!", "success");
+  }
+
   // =============================================
   // LÓGICA CORE
   // =============================================
@@ -313,15 +347,7 @@ const App = (() => {
   /** Busca a menor pontuação positiva (> 0) da mesa. Fallback para >= 0, depois 99.
    * @param {string} excludePlayerId - ID do jogador a excluir da busca (opcional) */
   function getLowestPositiveScore(excludePlayerId = null) {
-    const positivePlayers = players.filter(
-      (p) =>
-        !p.eliminated &&
-        p.score > 0 &&
-        (!excludePlayerId || p.id !== excludePlayerId),
-    );
-    if (positivePlayers.length > 0) {
-      return Math.min(...positivePlayers.map((p) => p.score));
-    }
+    // Retorna o menor score não-negativo (>= 0), excluindo o player especificado
     const activePlayers = players.filter(
       (p) =>
         !p.eliminated &&
@@ -1074,6 +1100,30 @@ const App = (() => {
   // RENDERIZAÇÃO (UI)
   // =============================================
 
+  /** Deleta um jogador da mesa (apenas durante setup) */
+  function deletePlayer(playerId) {
+    if (currentRound > 0) {
+      showToast("Não é possível deletar jogadores durante o jogo!", "warning");
+      return;
+    }
+
+    const player = players.find((p) => p.id === playerId);
+    if (!player) return;
+
+    takeSnapshot();
+
+    // Remove o jogador do array
+    players = players.filter((p) => p.id !== playerId);
+
+    // Remove da ordem original também
+    originalOrder = originalOrder.filter((id) => id !== playerId);
+
+    saveState();
+    renderGame();
+
+    showToast(`${player.name} foi removido da mesa!`, "info");
+  }
+
   function renderGame() {
     const amistoso = isAmistoso();
 
@@ -1179,11 +1229,75 @@ const App = (() => {
     // --- Lista de jogadores ---
     if (sorted.length === 0) {
       playersListEl.innerHTML = `
-                <div class="col-span-full text-center text-white opacity-70 mt-16 animate-fade-in">
-                    <i class="fa-solid fa-users text-6xl mb-4 block" aria-hidden="true"></i>
-                    <p class="text-xl">Adicione jogadores para começar!</p>
-                    <p class="text-base mt-2 opacity-70">Toque no botão <i class="fa-solid fa-user-plus" aria-hidden="true"></i> acima</p>
+                <div class="col-span-full flex flex-col items-center justify-center text-center text-white opacity-70 mt-8 animate-fade-in gap-6">
+                    <i class="fa-solid fa-users text-6xl block" aria-hidden="true"></i>
+                    <div>
+                        <p class="text-xl font-semibold mb-2">Adicione jogadores para começar!</p>
+                        <p class="text-base opacity-70">Clique abaixo ou use o botão na barra superior</p>
+                    </div>
+                    <button type="button" onclick="document.getElementById('modal-add-player').showModal()"
+                        class="bg-green-600 hover:bg-green-500 active:scale-95 text-white font-bold py-4 px-8 rounded-xl shadow-lg transition-all focus:ring-4 focus:ring-green-300 focus:outline-none min-h-[48px] text-lg flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-user-plus" aria-hidden="true"></i>
+                        Adicionar Jogador
+                    </button>
                 </div>`;
+    } else if (sorted.length > 0 && currentRound === 0) {
+      // Modo setup: mostrar lista de jogadores dragáveis + botões de ação
+      let html = `<div class="col-span-full text-center text-green-200 text-sm mb-3 animate-fade-in">
+                    <i class="fa-solid fa-layer-group mr-1" aria-hidden="true"></i>
+                    ${sorted.length} jogador${sorted.length !== 1 ? "es" : ""}
+                </div>
+                <div class="col-span-full text-center text-green-200 text-sm mb-4 animate-fade-in">
+                    <i class="fa-solid fa-arrows-up-down mr-1" aria-hidden="true"></i>
+                    Arraste para organizar a ordem da mesa
+                </div>`;
+
+      // Renderizar cards dos jogadores com drag-and-drop habilitado
+      sorted.forEach((p) => {
+        const safeName = escapeHtml(p.name);
+        html += `
+                <div class="player-card bg-white rounded-lg p-4 shadow cursor-move hover:shadow-lg transition-all" 
+                     draggable="true" data-player-id="${p.id}">
+                    <div class="flex items-center gap-3">
+                        <div class="w-12 h-12 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold flex-shrink-0">
+                            ${safeName.charAt(0)}
+                        </div>
+                        <div class="flex-grow min-w-0">
+                            <div class="font-bold text-gray-800 truncate">${safeName}</div>
+                            <div class="text-sm text-gray-500">Score: 99</div>
+                        </div>
+                        <button type="button" data-delete-player="${p.id}"
+                            class="text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg p-2 transition-all active:scale-90 focus:outline-none focus:ring-2 focus:ring-red-300"
+                            aria-label="Deletar ${safeName}">
+                            <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                        </button>
+                        <div class="text-gray-400 cursor-grab active:cursor-grabbing drag-handle">
+                            <i class="fa-solid fa-grip-vertical" aria-hidden="true"></i>
+                        </div>
+                    </div>
+                </div>`;
+      });
+
+      // Botões de ação
+      const isDisabled = sorted.length <= 1;
+      const disabledClass = isDisabled
+        ? "opacity-50 cursor-not-allowed"
+        : "hover:bg-yellow-400 active:scale-95";
+      const disabledAttr = isDisabled ? "disabled" : "";
+
+      html += `<div class="col-span-full flex flex-col md:flex-row gap-3 justify-center mt-4 pt-4 border-t border-green-700">
+                    <button type="button" onclick="document.getElementById('modal-add-player').showModal()"
+                        class="bg-green-600 hover:bg-green-500 active:scale-95 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition-all focus:ring-4 focus:ring-green-300 focus:outline-none min-h-[48px] text-base flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-user-plus" aria-hidden="true"></i>
+                        Continuar Adicionando
+                    </button>
+                    <button type="button" onclick="App.startGame()" ${disabledAttr}
+                        class="bg-yellow-500 ${disabledClass} text-black font-bold py-3 px-6 rounded-lg shadow-lg transition-all focus:ring-4 focus:ring-yellow-300 focus:outline-none min-h-[48px] text-base flex items-center justify-center gap-2 disabled:shadow-none">
+                        <i class="fa-solid fa-play" aria-hidden="true"></i>
+                        Começar Partida
+                    </button>
+                </div>`;
+      playersListEl.innerHTML = html;
     } else {
       let html = "";
 
@@ -1379,6 +1493,7 @@ const App = (() => {
       modalSettlement.close(),
     );
     btnUndo.addEventListener("click", undo);
+    $("btn-restart-partida").addEventListener("click", restartPartida);
     $("btn-restart-game").addEventListener("click", newGame);
 
     // Modal adicionar jogador
@@ -1408,11 +1523,18 @@ const App = (() => {
       modalHistory.close(),
     );
 
-    // Delegação de evento para botões de pagamento
+    // Delegação de evento para botões de pagamento e deletar jogador
     playersListEl.addEventListener("click", (e) => {
-      const btn = e.target.closest("[data-toggle-payment]");
-      if (btn) {
-        const id = parseInt(btn.dataset.togglePayment);
+      const deleteBtn = e.target.closest("[data-delete-player]");
+      if (deleteBtn) {
+        const id = parseInt(deleteBtn.dataset.deletePlayer);
+        deletePlayer(id);
+        return;
+      }
+
+      const paymentBtn = e.target.closest("[data-toggle-payment]");
+      if (paymentBtn) {
+        const id = parseInt(paymentBtn.dataset.togglePayment);
         togglePayment(id);
       }
     });
@@ -1440,5 +1562,5 @@ const App = (() => {
     init();
   }
 
-  return { showToast };
+  return { showToast, startGame, restartPartida };
 })();

@@ -159,7 +159,27 @@ input[type="number"]::-webkit-outer-spin-button {
 
   /* Setup screen - Melhor distribuição */
   #setup-screen {
-    padding: 20px !important;
+    padding: 12px !important;
+    gap: 0 !important;
+  }
+
+  #setup-screen i {
+    font-size: 48px !important;
+    margin-bottom: 8px !important;
+  }
+
+  #setup-screen h1 {
+    font-size: 32px !important;
+    margin-bottom: 16px !important;
+  }
+
+  #mode-selection {
+    gap: 12px !important;
+    width: 100% !important;
+  }
+
+  #apostado-fields {
+    gap: 12px !important;
   }
 }
 
