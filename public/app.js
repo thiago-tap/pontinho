@@ -310,13 +310,24 @@ const App = (() => {
   // LÓGICA CORE
   // =============================================
 
-  /** Busca a menor pontuação positiva (> 0) da mesa. Fallback para >= 0, depois 99. */
-  function getLowestPositiveScore() {
-    const positivePlayers = players.filter((p) => !p.eliminated && p.score > 0);
+  /** Busca a menor pontuação positiva (> 0) da mesa. Fallback para >= 0, depois 99.
+   * @param {string} excludePlayerId - ID do jogador a excluir da busca (opcional) */
+  function getLowestPositiveScore(excludePlayerId = null) {
+    const positivePlayers = players.filter(
+      (p) =>
+        !p.eliminated &&
+        p.score > 0 &&
+        (!excludePlayerId || p.id !== excludePlayerId),
+    );
     if (positivePlayers.length > 0) {
       return Math.min(...positivePlayers.map((p) => p.score));
     }
-    const activePlayers = players.filter((p) => !p.eliminated && p.score >= 0);
+    const activePlayers = players.filter(
+      (p) =>
+        !p.eliminated &&
+        p.score >= 0 &&
+        (!excludePlayerId || p.id !== excludePlayerId),
+    );
     if (activePlayers.length > 0) {
       return Math.min(...activePlayers.map((p) => p.score));
     }
@@ -670,6 +681,31 @@ const App = (() => {
     // Não tiramos snapshot aqui porque já foi feito ANTES de processar a rodada.
     // Isso garante que Undo reverte toda a rodada + estouros em uma ação.
 
+    // VERIFICAÇÃO INICIAL: Se há múltiplos estouradores, declara o vencedor direto
+    const estouradores = players.filter((p) => !p.eliminated && p.score < 0);
+    const ativosComPontos = players.filter(
+      (p) => !p.eliminated && p.score >= 0,
+    );
+
+    if (estouradores.length >= 2 && ativosComPontos.length === 1) {
+      // REGRA: Múltiplos estouradores = vencedor automático
+      const vencedor = ativosComPontos[0];
+      vencedor.score = 99; // Garantir score positivo
+
+      // Eliminar todos os estouradores
+      estouradores.forEach((p) => {
+        p.eliminated = true;
+      });
+
+      showToast(
+        `${estouradores.map((p) => p.name).join(" e ")} estouraram! ${vencedor.name} é o VENCEDOR! 🏆`,
+        "success",
+      );
+      saveState();
+      return; // SAIR sem processar rebuy
+    }
+
+    // PROCESSAMENTO NORMAL: Oferecer rebuy individualmente
     for (const player of players) {
       if (!player.eliminated && player.score < 0) {
         // Feedback tátil no mobile
@@ -681,9 +717,11 @@ const App = (() => {
           (p) => p.id !== player.id && !p.eliminated && p.score >= 0,
         ).length;
 
-        // Reentrada permitida se há pelo menos 1 outro jogador ativo
-        // Ao reentrar, o jogador voltaria ao jogo (mínimo 2 ativos totais)
-        if (activeExcludingThis >= 1) {
+        // REGRA: Se há 2+ ativos, ofereça rebuy
+        // Se há 1 ativo, declare vencedor automático
+        // Se há 0 ativos, este é o vencedor (todos estouraram)
+        if (activeExcludingThis >= 2) {
+          // Há 2+ ativos: ofereça rebuy
           const rebuyMsg = isAmistoso()
             ? `Pontuação: ${player.score}. Deseja voltar ao jogo?`
             : `Pontuação: ${player.score}. Deseja pagar a volta (R$ ${config.rebuy.toFixed(2)})?`;
@@ -695,7 +733,8 @@ const App = (() => {
 
           if (confirmed) {
             // Reentrada confirmada: restaurar pontuação e ajustar dívida
-            const targetScore = getLowestPositiveScore();
+            // Excluir este jogador da busca de menor score (ele tem score negativo agora)
+            const targetScore = getLowestPositiveScore(player.id);
             player.score = targetScore;
             player.debt += config.rebuy;
             player.hasPaid = false;
@@ -708,13 +747,36 @@ const App = (() => {
             player.eliminated = true;
             showToast(`${player.name} foi eliminado!`, "error");
           }
-        } else {
-          // Nenhum outro jogador ativo: eliminação automática
+        } else if (activeExcludingThis === 1) {
+          // Apenas 1 ativo restante: vencedor automático!
+          const vencedor = players.find(
+            (p) => p.id !== player.id && !p.eliminated && p.score >= 0,
+          );
+          vencedor.score = 99;
           player.eliminated = true;
           showToast(
-            `${player.name} foi eliminado! Não há jogadores suficientes para reentrada.`,
-            "error",
+            `${player.name} estourou! ${vencedor.name} é o VENCEDOR! 🏆`,
+            "success",
           );
+          break; // SAIR - há um vencedor
+        } else {
+          // Nenhum otro jogador ativo: este é o vencedor!
+          // Restaurar score para valor positivo (é o vencedor após todos estourarem)
+          const winnerScore = 99; // Score padrão de vencedor
+          player.score = winnerScore;
+
+          // Eliminar todos os outros que ainda têm score negativo (também estouraram)
+          players.forEach((p) => {
+            if (p.id !== player.id && !p.eliminated && p.score < 0) {
+              p.eliminated = true;
+            }
+          });
+
+          showToast(
+            `${player.name} ESTOUROU! Todos os outros também. ${player.name} é o VENCEDOR! 🏆`,
+            "success",
+          );
+          break; // PARAR a iteração - há um vencedor!
         }
       }
     }
