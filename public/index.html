@@ -6,6 +6,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="description" content="Pontinho Master - Gerenciador de pontuação para o jogo de cartas Pontinho">
     <meta name="theme-color" content="#166534">
+
+    <!-- Open Graph / Social sharing -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://pontinho.catiteo.com">
+    <meta property="og:title" content="Pontinho Master">
+    <meta property="og:description" content="Gerenciador de pontuação para o jogo de cartas Pontinho. Modo apostado e amistoso.">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Pontinho Master">
+    <meta name="twitter:description" content="Gerenciador de pontuação para o jogo de cartas Pontinho.">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+
     <title>Pontinho Master</title>
 
     <!-- Tailwind CSS (CDN + Config) -->
@@ -195,9 +208,9 @@
     </main>
 
     <!-- Modal: Adicionar Jogador -->
-    <dialog id="modal-add-player" class="w-full max-w-md rounded-lg">
+    <dialog id="modal-add-player" class="w-full max-w-md rounded-lg" aria-modal="true" aria-labelledby="modal-add-player-title">
         <div class="bg-white rounded-lg p-6">
-            <h2 class="text-xl font-bold mb-4">Novo Jogador</h2>
+            <h2 id="modal-add-player-title" class="text-xl font-bold mb-4">Novo Jogador</h2>
             <label for="new-player-name" class="sr-only">Nome do jogador</label>
             <input type="text" id="new-player-name"
                 class="w-full border-2 border-gray-200 p-4 rounded-lg mb-6 uppercase focus:border-green-500 focus:ring-2 focus:ring-green-300 focus:outline-none min-h-[48px] text-base"
@@ -216,9 +229,9 @@
     </dialog>
 
     <!-- Modal: Fim da Rodada -->
-    <dialog id="modal-end-round" class="w-full max-w-md rounded-lg">
+    <dialog id="modal-end-round" class="w-full max-w-md rounded-lg" aria-modal="true" aria-labelledby="modal-end-round-title">
         <div class="bg-white rounded-lg p-6 max-h-[80vh] flex flex-col">
-            <h2 class="text-xl font-bold mb-2">Fim da Rodada</h2>
+            <h2 id="modal-end-round-title" class="text-xl font-bold mb-2">Fim da Rodada</h2>
             <p class="text-sm text-gray-600 mb-4">Quantos pontos cada um <strong>PERDEU</strong>?</p>
 
             <div id="round-inputs" class="overflow-y-auto flex-grow mb-6 space-y-3"></div>
@@ -237,7 +250,7 @@
     </dialog>
 
     <!-- Modal: Confirmação (Estouro/Rebuy) -->
-    <dialog id="modal-confirm" class="w-full max-w-md rounded-lg">
+    <dialog id="modal-confirm" class="w-full max-w-md rounded-lg" aria-modal="true" aria-labelledby="confirm-title">
         <div class="bg-white rounded-lg p-6 text-center">
             <div id="confirm-icon" class="text-6xl mb-4">
                 <i class="fa-solid fa-explosion text-red-500" aria-hidden="true"></i>
@@ -258,9 +271,9 @@
     </dialog>
 
     <!-- Modal: Histórico de Rodadas -->
-    <dialog id="modal-history" class="w-full max-w-md rounded-lg">
+    <dialog id="modal-history" class="w-full max-w-md rounded-lg" aria-modal="true" aria-labelledby="modal-history-title">
         <div class="bg-white rounded-lg p-6 max-h-[80vh] flex flex-col">
-            <h2 class="text-xl font-bold mb-4">
+            <h2 id="modal-history-title" class="text-xl font-bold mb-4">
                 <i class="fa-solid fa-clock-rotate-left text-green-600 mr-2" aria-hidden="true"></i>
                 Histórico de Rodadas
             </h2>
@@ -274,9 +287,9 @@
     </dialog>
 
     <!-- Modal: Como Jogar -->
-    <dialog id="modal-help" class="w-full max-w-lg rounded-lg">
+    <dialog id="modal-help" class="w-full max-w-lg rounded-lg" aria-modal="true" aria-labelledby="modal-help-title">
         <div class="bg-white rounded-lg p-6 max-h-[85vh] flex flex-col">
-            <h2 class="text-xl font-bold mb-4 text-green-800">
+            <h2 id="modal-help-title" class="text-xl font-bold mb-4 text-green-800">
                 <i class="fa-solid fa-circle-question text-green-600 mr-2" aria-hidden="true"></i>
                 Como Jogar
             </h2>
@@ -345,11 +358,11 @@
     </dialog>
 
     <!-- Modal: Acerto de Contas -->
-    <dialog id="modal-settlement" class="w-full max-w-md rounded-lg">
+    <dialog id="modal-settlement" class="w-full max-w-md rounded-lg" aria-modal="true" aria-labelledby="modal-settlement-title">
         <div class="bg-white rounded-lg p-6 max-h-[90vh] flex flex-col">
             <div class="text-center mb-4">
                 <i class="fa-solid fa-handshake text-green-600 text-4xl mb-2" aria-hidden="true"></i>
-                <h2 class="text-2xl font-bold text-green-800">Acerto de Contas</h2>
+                <h2 id="modal-settlement-title" class="text-2xl font-bold text-green-800">Acerto de Contas</h2>
                 <p class="text-sm text-gray-500 mt-1">Marque quem pagou</p>
             </div>
 

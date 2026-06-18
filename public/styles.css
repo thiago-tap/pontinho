@@ -29,10 +29,6 @@ dialog {
   width: calc(100% - 2rem);
 }
 
-dialog[open] {
-  animation: fadeIn 0.2s ease-out;
-}
-
 /* --- Safe Areas (dispositivos com notch) --- */
 @supports (padding: env(safe-area-inset-bottom)) {
   .safe-bottom {
@@ -115,11 +111,6 @@ input[type="number"]::-webkit-outer-spin-button {
     padding: 4px 10px !important;
     font-size: 12px !important;
     min-width: fit-content !important;
-  }
-
-  /* Flex gaps - Mais espaçamento */
-  .flex {
-    gap: 12px !important;
   }
 
   /* Text - Mais legível */

@@ -1235,7 +1235,7 @@ const App = (() => {
                         <p class="text-xl font-semibold mb-2">Adicione jogadores para começar!</p>
                         <p class="text-base opacity-70">Clique abaixo ou use o botão na barra superior</p>
                     </div>
-                    <button type="button" onclick="document.getElementById('modal-add-player').showModal()"
+                    <button type="button" data-action="add-player"
                         class="bg-green-600 hover:bg-green-500 active:scale-95 text-white font-bold py-4 px-8 rounded-xl shadow-lg transition-all focus:ring-4 focus:ring-green-300 focus:outline-none min-h-[48px] text-lg flex items-center justify-center gap-2">
                         <i class="fa-solid fa-user-plus" aria-hidden="true"></i>
                         Adicionar Jogador
@@ -1286,12 +1286,12 @@ const App = (() => {
       const disabledAttr = isDisabled ? "disabled" : "";
 
       html += `<div class="col-span-full flex flex-col md:flex-row gap-3 justify-center mt-4 pt-4 border-t border-green-700">
-                    <button type="button" onclick="document.getElementById('modal-add-player').showModal()"
+                    <button type="button" data-action="add-player"
                         class="bg-green-600 hover:bg-green-500 active:scale-95 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition-all focus:ring-4 focus:ring-green-300 focus:outline-none min-h-[48px] text-base flex items-center justify-center gap-2">
                         <i class="fa-solid fa-user-plus" aria-hidden="true"></i>
                         Continuar Adicionando
                     </button>
-                    <button type="button" onclick="App.startGame()" ${disabledAttr}
+                    <button type="button" data-action="start-game" ${disabledAttr}
                         class="bg-yellow-500 ${disabledClass} text-black font-bold py-3 px-6 rounded-lg shadow-lg transition-all focus:ring-4 focus:ring-yellow-300 focus:outline-none min-h-[48px] text-base flex items-center justify-center gap-2 disabled:shadow-none">
                         <i class="fa-solid fa-play" aria-hidden="true"></i>
                         Começar Partida
@@ -1523,8 +1523,21 @@ const App = (() => {
       modalHistory.close(),
     );
 
-    // Delegação de evento para botões de pagamento e deletar jogador
+    // Delegação de evento para botões de pagamento, deletar jogador e ações da lista
     playersListEl.addEventListener("click", (e) => {
+      const actionBtn = e.target.closest("[data-action]");
+      if (actionBtn) {
+        const action = actionBtn.dataset.action;
+        if (action === "add-player") {
+          newPlayerNameInput.value = "";
+          modalAddPlayer.showModal();
+          setTimeout(() => newPlayerNameInput.focus(), 100);
+        } else if (action === "start-game") {
+          startGame();
+        }
+        return;
+      }
+
       const deleteBtn = e.target.closest("[data-delete-player]");
       if (deleteBtn) {
         const id = parseInt(deleteBtn.dataset.deletePlayer);
