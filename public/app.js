@@ -14,7 +14,8 @@ const App = (() => {
   let gameStarted = false;
   let originalOrder = []; // Ordem física da mesa (IDs dos jogadores)
   let dealerIndex = 0; // Índice em originalOrder para o dealer atual
-  let undoSnapshot = null; // Último snapshot para desfazer
+  let undoStack = []; // Pilha de snapshots para desfazer (máx. UNDO_MAX)
+  const UNDO_MAX = 10;
   let confettiShown = false; // Flag para não repetir confetti
 
   // --- REFERÊNCIAS DOM ---
@@ -147,7 +148,7 @@ const App = (() => {
         gameStarted,
         originalOrder,
         dealerIndex,
-        undoSnapshot,
+        undoStack,
       };
       localStorage.setItem("pontinho-state", JSON.stringify(state));
     } catch (e) {
@@ -168,7 +169,8 @@ const App = (() => {
       gameStarted = state.gameStarted || false;
       originalOrder = state.originalOrder || [];
       dealerIndex = state.dealerIndex || 0;
-      undoSnapshot = state.undoSnapshot || null;
+      // Migração: aceita undoStack (atual) e descarta undoSnapshot (legado)
+      undoStack = Array.isArray(state.undoStack) ? state.undoStack : [];
 
       // Migração: adiciona campos novos a jogadores antigos
       players.forEach((p) => {
@@ -190,32 +192,41 @@ const App = (() => {
   // SISTEMA UNDO (Ponto de Restauração)
   // =============================================
 
-  /** Salva um snapshot do estado atual antes de cada processamento */
+  /** Salva um snapshot do estado atual (máx. UNDO_MAX níveis) */
   function takeSnapshot() {
-    undoSnapshot = {
+    undoStack.push({
       players: JSON.parse(JSON.stringify(players)),
       roundHistory: JSON.parse(JSON.stringify(roundHistory)),
       currentRound,
       dealerIndex,
       originalOrder: [...originalOrder],
-    };
+    });
+    if (undoStack.length > UNDO_MAX) {
+      undoStack.shift();
+    }
   }
 
-  /** Restaura o último snapshot salvo */
+  /** Restaura o snapshot mais recente da pilha */
   function undo() {
-    if (!undoSnapshot) {
+    if (undoStack.length === 0) {
       showToast("Nada para desfazer!", "warning");
       return;
     }
-    players = undoSnapshot.players;
-    roundHistory = undoSnapshot.roundHistory;
-    currentRound = undoSnapshot.currentRound;
-    dealerIndex = undoSnapshot.dealerIndex;
-    originalOrder = undoSnapshot.originalOrder;
-    undoSnapshot = null;
+    const snapshot = undoStack.pop();
+    players = snapshot.players;
+    roundHistory = snapshot.roundHistory;
+    currentRound = snapshot.currentRound;
+    dealerIndex = snapshot.dealerIndex;
+    originalOrder = snapshot.originalOrder;
     saveState();
     renderGame();
-    showToast("Ação desfeita!", "info");
+    const remaining = undoStack.length;
+    showToast(
+      remaining > 0
+        ? `Ação desfeita! (${remaining} restante${remaining !== 1 ? "s" : ""})`
+        : "Ação desfeita!",
+      "info",
+    );
   }
 
   // =============================================
@@ -287,7 +298,7 @@ const App = (() => {
     gameStarted = false;
     originalOrder = [];
     dealerIndex = 0;
-    undoSnapshot = null;
+    undoStack = [];
     confettiShown = false;
 
     clearState();
@@ -327,7 +338,7 @@ const App = (() => {
     roundHistory = [];
     currentRound = 0;
     dealerIndex = 0;
-    undoSnapshot = null;
+    undoStack = [];
     confettiShown = false;
     originalOrder = [];
 
@@ -1144,7 +1155,7 @@ const App = (() => {
     }
 
     // --- Botão Undo ---
-    btnUndo.classList.toggle("hidden", !undoSnapshot);
+    btnUndo.classList.toggle("hidden", undoStack.length === 0);
 
     // --- Contador de rodadas + jogadores ativos ---
     if (currentRound > 0) {

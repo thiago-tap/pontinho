@@ -1,0 +1,21 @@
+{
+  "name": "Pontinho Master",
+  "short_name": "Pontinho",
+  "description": "Gerenciador de pontuação para o jogo de cartas Pontinho",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#166534",
+  "theme_color": "#166534",
+  "orientation": "portrait-primary",
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "categories": ["games", "entertainment"],
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
